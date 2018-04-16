@@ -4,10 +4,12 @@ public class ISFJiraIdentifiers {
 
 	private String upn;
 	private String email;
+	private String abn;
 
-	public ISFJiraIdentifiers(String upn, String email) {
+	public ISFJiraIdentifiers(String upn, String email, String abn) {
 		this.upn = upn;
 		this.email = email;
+		this.abn=abn;
 	}
 
 	public String getUpn() {
@@ -18,8 +20,13 @@ public class ISFJiraIdentifiers {
 		return email;
 	}
 	
+	public String getAbn(){
+		return abn;
+	}
+	
+	@Override
 	public String toString() {
-		return "ISFJiraIdentifiers [upn=" + upn + ", email=" + email + "]";
+		return "ISFJiraIdentifiers [upn=" + upn + ", email=" + email + ", abn=" + abn + "]";
 	}
 
 }

@@ -18,9 +18,11 @@
  */
 package org.jasig.cas.client.integration.atlassian;
 
+import java.io.FileInputStream;
 import java.security.Principal;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -61,6 +63,18 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	private static final long serialVersionUID = 3852011252741183166L;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(Jira44CasAuthenticator.class);
+	public static Properties appProps = new Properties();		
+	static {		
+		String propertiesLocation="/tmp/jira/jira.properties";
+		try{
+			appProps.load(new FileInputStream(propertiesLocation));			
+			LOGGER.error("Read the properties from:" + propertiesLocation );
+
+		}catch (Exception e){
+			LOGGER.error("Cloud not read properties from:" );
+		}
+	}
+	
 
 	public Principal getUser(final HttpServletRequest request, final HttpServletResponse response) {
 		// First, check to see if this session has already been authenticated
@@ -101,6 +115,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 		//do we have ISF UID header, if we do, do stuff with it
 		String uid=request.getHeader("UID");
 		if (uid !=null){
+			LOGGER.error("Got UID:" + uid);
 			ISFJiraIdentifiers isfIdentifiers=null;
 			try {
 				isfIdentifiers = ISFUtils.getISFIdentifiers(ISFUtils.getXMLFromBase64String(uid));
@@ -111,33 +126,46 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 			
 			String upn = isfIdentifiers.getUpn();
 			String email = isfIdentifiers.getEmail();
+			String abn = isfIdentifiers.getAbn();
+			
+			LOGGER.error("ISF identifiers: "  + uid + " upn='" + upn +"' email='" + email + "'");
 			
 			if (upn == null || email ==null){
 				LOGGER.error("ISF uid or email null. ISF uid:"  + uid + " upn='" + upn +"' email='" + email + "'");
-			
 			//do the authentication or reqistration
 			}else{
 				//check if user exists, if it does, log them in and return. Happy days.
 				try {
-				boolean userExists= JiraAuthAndRegistrationUtils.userExistsInJira(upn);
+					boolean userExists= JiraAuthAndRegistrationUtils.userExistsInJira(upn);
+					LOGGER.error("Does user exist:" + upn + ":" + userExists);
 				if (userExists){
 					return logInExistingUser(upn,request);
 				}
 				//user does not exist. Register them and log them in on the fly.
 				else{
+					 LOGGER.error("Starting a workflow to create a new user in JIRA:" + upn);
 					 JiraAuthAndRegistrationUtils.createNewJiraUser(upn,email);
+					 JiraAuthAndRegistrationUtils.addUidPropertyToUser(upn);
+					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
+					 String newOrgId = JiraAuthAndRegistrationUtils.createOrganisationinServiceDesk(abn);
+					 JiraAuthAndRegistrationUtils.createCustomerInServiceDesk(email);
+					 JiraAuthAndRegistrationUtils.addCustomerToOrganisation(newOrgId, upn);
+					 
+					 
+					 
+					 
+					 //final step, log in new user
+					 
+					 return logInExistingUser(upn,request);
+
 				}
-				} catch (JSONException e) {
+				} catch (Exception e) {
 					LOGGER.error("Something went wrong with checking if user exists:" + upn + " "+ e);
 				}
 				
 			}
 			
 		}
-		
-
-		
-		
 		LOGGER.error("---> Calling super");
 		return super.getUser(request, response);
 	}
@@ -175,37 +203,35 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	
 	
 	
-	private static String generateRandomId(){
-		long millis = System.currentTimeMillis() % 1000;
-		return "ucxek" + millis;
-	}
 	
 	
-	public static void getJiraUser(String username) throws JSONException{
-		
-		 String url = "http://localhost:8080/rest/api/2/user?username="+username;
-		 
-			String plainCreds = "admin:admin";
-			byte[] plainCredsBytes = plainCreds.getBytes();
-			byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
-			String base64Creds = new String(base64CredsBytes);
+//	public static void getJiraUser(String username) throws JSONException{
+//		
+//		 String url = "http://localhost:8080/rest/api/2/user?username="+username;
+//		 
+//		 	LOGGER.error("calling getJiraUser with username:" + username);
+//			String plainCreds = "admin:admin";
+//			byte[] plainCredsBytes = plainCreds.getBytes();
+//			byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
+//			String base64Creds = new String(base64CredsBytes);
+//
+//			HttpHeaders headers = new HttpHeaders();
+//			headers.add("Authorization", "Basic " + base64Creds);
+//			headers.setContentType(MediaType.APPLICATION_JSON);
+//			headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+//
+//			RestTemplate restTemplate = new RestTemplate();
+//			HttpEntity<String> request = new HttpEntity<String>(headers);
+//			LOGGER.error(request.toString());
+//			LOGGER.error(request.getHeaders().toString());
+//			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+//			String stringResponse = response.getBody();
+//			LOGGER.error(stringResponse);
+//			JSONObject user = new JSONObject(stringResponse);
+//			LOGGER.error("End "+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
+//	}
 
-			HttpHeaders headers = new HttpHeaders();
-			headers.add("Authorization", "Basic " + base64Creds);
-			headers.setContentType(MediaType.APPLICATION_JSON);
-			headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-			RestTemplate restTemplate = new RestTemplate();
-			HttpEntity<String> request = new HttpEntity<String>(headers);
-			LOGGER.error(request.toString());
-			LOGGER.error(request.getHeaders().toString());
-			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-			String stringResponse = response.getBody();
-			LOGGER.error(stringResponse);
-			JSONObject user = new JSONObject(stringResponse);
-			LOGGER.error("--++>>"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
-	}
-
+	
 	
 
 
