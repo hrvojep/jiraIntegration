@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.security.Principal;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
@@ -50,11 +51,6 @@ import com.atlassian.seraph.auth.AuthenticatorException;
  * Extension of JiraSeraphAuthenticator to allow people to configure JIRA 4.4
  * and above to authenticate via Jasig CAS
  *
- * @author Scott Battaglia
- * @author Martin Stiborsky
- * @author Jozef Kotlar
- * @version $Revision$ $Date$
- * @since 3.3.0
  */
 @AuthenticationContextAwareAuthenticator
 public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
@@ -68,10 +64,11 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 		String propertiesLocation="/tmp/jira/jira.properties";
 		try{
 			appProps.load(new FileInputStream(propertiesLocation));			
-			LOGGER.error("Read the properties from:" + propertiesLocation );
+			LOGGER.error("Read the properties from:" + propertiesLocation + " v1");
 
 		}catch (Exception e){
-			LOGGER.error("Cloud not read properties from:" );
+			LOGGER.error("Cloud not read properties from:" + propertiesLocation);
+			LOGGER.error(e.getMessage(),e);
 		}
 	}
 	
@@ -88,6 +85,15 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 			LOGGER.error("---> Existing user:" + existingUser.getName());
 
 			return existingUser;
+		}
+		
+		Enumeration<String> headerNames =request.getHeaderNames();
+		LOGGER.error("---> Print header names");
+		while (headerNames.hasMoreElements()){
+			String headerName = headerNames.nextElement();
+			if (headerName.equals("isf8uid")){
+				LOGGER.error("->"+ headerName + ":-->"+request.getHeader(headerName));
+			}
 		}
 
 		// final HttpSession session = request.getSession();
@@ -113,7 +119,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 
 
 		//do we have ISF UID header, if we do, do stuff with it
-		String uid=request.getHeader("UID");
+		String uid=request.getHeader("isf8uid");
 		if (uid !=null){
 			LOGGER.error("Got UID:" + uid);
 			ISFJiraIdentifiers isfIdentifiers=null;
@@ -124,9 +130,9 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				LOGGER.error("Unable to extract ISF uid:" + uid + " " + e);
 			}
 			
-			String upn = isfIdentifiers.getUpn();
-			String email = isfIdentifiers.getEmail();
-			String abn = isfIdentifiers.getAbn();
+			String upn = isfIdentifiers.getUpn().trim();
+			String email = isfIdentifiers.getEmail().trim();
+			String abn = isfIdentifiers.getAbn().trim();
 			
 			LOGGER.error("ISF identifiers: "  + uid + " upn='" + upn +"' email='" + email + "'");
 			
@@ -143,7 +149,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				}
 				//user does not exist. Register them and log them in on the fly.
 				else{
-					 LOGGER.error("Starting a workflow to create a new user in JIRA:" + upn);
+					 LOGGER.error("Starting a workflow to create a new user in JIRA upn:'" + upn +"' email:'" + email + "'" );
 					 JiraAuthAndRegistrationUtils.createNewJiraUser(upn,email);
 					 JiraAuthAndRegistrationUtils.addUidPropertyToUser(upn);
 					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
@@ -181,7 +187,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				return username;
 			}
 		};
-		LOGGER.error("---> Returning default name user");
+		LOGGER.error("---> login existing user:" + upn);
 	    putPrincipalInSessionContext(request, principal);
 		getElevatedSecurityGuard().onSuccessfulLoginAttempt(request,username);
 		return principal;

@@ -34,9 +34,9 @@ public class ISFUtils {
 		DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		InputSource src = new InputSource(new StringReader(xmlString));
 		Document doc = builder.parse(src);
-		String upn = doc.getElementsByTagName("upn").item(0).getTextContent();
-		String email = doc.getElementsByTagName("email").item(0).getTextContent();
-		String abn = doc.getElementsByTagName("abn").item(0).getTextContent();
+		String upn = doc.getElementsByTagName("upn").item(0).getTextContent().trim();
+		String email = doc.getElementsByTagName("email").item(0).getTextContent().trim();
+		String abn = doc.getElementsByTagName("abn").item(0).getTextContent().trim();
 		return new ISFJiraIdentifiers(upn, email, abn);
 	}
 	

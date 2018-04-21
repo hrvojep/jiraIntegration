@@ -10,6 +10,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.atlassian.jira.util.json.JSONException;
@@ -20,9 +22,9 @@ public class JiraAuthAndRegistrationUtils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(JiraAuthAndRegistrationUtils.class);
 
 	private static String localJiraUrl = "http://localhost:8080";
-	private static String jiraUser=Jira44CasAuthenticator.appProps.getProperty("adminUser");
+	private static String jiraUser=Jira44CasAuthenticator.appProps.getProperty("adminuser");
 	private static String jiraPassword = Jira44CasAuthenticator.appProps.getProperty("adminpassword");
-	private static String plainCreds = jiraUser+jiraPassword;
+	private static String plainCreds = jiraUser+":" +jiraPassword;
 
 	public static boolean userExistsInJira(String userUpn) throws JSONException {
 		
@@ -33,19 +35,23 @@ public class JiraAuthAndRegistrationUtils {
 		String getUserUrlEndpoint = "/rest/api/2/user?username=";
 		String fullUrl = localJiraUrl + getUserUrlEndpoint + userUpn;
 
-		String plainCreds = jiraUser+jiraPassword;
-		byte[] plainCredsBytes = plainCreds.getBytes();
-		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
-		String base64Creds = new String(base64CredsBytes);
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.add("Authorization", "Basic " + base64Creds);
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+//		String plainCreds = jiraUser+jiraPassword;
+//		byte[] plainCredsBytes = plainCreds.getBytes();
+//		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
+//		String base64Creds = new String(base64CredsBytes);
+//
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.add("Authorization", "Basic " + base64Creds);
+//		headers.setContentType(MediaType.APPLICATION_JSON);
+//		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
 
 		RestTemplate restTemplate = new RestTemplate();
-		HttpEntity<String> request = new HttpEntity<String>(headers);
-		LOGGER.error("making request with url:" + fullUrl);		
+//		HttpEntity<String> request = new HttpEntity<String>(headers);
+		
+		HttpEntity<String> request = getRequest(null,false);
+
+		
+		LOGGER.error("making request with url:" + fullUrl + " requestBody:" + request.getBody() + " requestToString:" + request.toString());		
 		try {
 		ResponseEntity<String> response = restTemplate.exchange(fullUrl, HttpMethod.GET, request, String.class);
 		String stringResponse = response.getBody();
@@ -60,8 +66,10 @@ public class JiraAuthAndRegistrationUtils {
 			LOGGER.error("User:'" + userUpn + "' does not exist!");
 			userFound = false;
 		}
-		} catch (org.springframework.web.client.RestClientException e){
-			LOGGER.error("User:'" + userUpn + "' not found");
+		} catch (HttpClientErrorException e){
+		    LOGGER.error(e.getMessage());
+		    LOGGER.error(e.getResponseBodyAsString());
+		    LOGGER.error(e.getStatusCode().toString());
 		}
 		return userFound;
 	}
@@ -73,15 +81,15 @@ public class JiraAuthAndRegistrationUtils {
 		String url = "http://localhost:8080/rest/api/2/user";
 		//String url = "https://hookb.in/v0PPBPX0";
 		
-		LOGGER.error("registering new user upn:'" + upn +" ' email:'" + email + "'");
-		byte[] plainCredsBytes = plainCreds.getBytes();
-		byte[] base64CredsBytes =Base64.getEncoder().encode(plainCredsBytes);
-		String base64Creds = new String(base64CredsBytes);
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.add("Authorization", "Basic " + base64Creds);
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+		LOGGER.error("registering new user upn:'" + upn +"' email:'" + email + "'");
+//		byte[] plainCredsBytes = plainCreds.getBytes();
+//		byte[] base64CredsBytes =Base64.getEncoder().encode(plainCredsBytes);
+//		String base64Creds = new String(base64CredsBytes);
+//
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.add("Authorization", "Basic " + base64Creds);
+//		headers.setContentType(MediaType.APPLICATION_JSON);
+//		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
 		
 		RestTemplate restTemplate = new RestTemplate();
 		JSONObject json = new JSONObject();
@@ -90,19 +98,32 @@ public class JiraAuthAndRegistrationUtils {
 		json.put("emailAddress", email);
 		json.put("displayName", email);
 		
-		String jsonString = json.toString();
-		HttpEntity<String> request = new HttpEntity<String>(jsonString, headers);
+		String requestBody = json.toString();
+		HttpEntity<String> request = getRequest(requestBody,false);
+
+		//HttpEntity<String> request = new HttpEntity<String>(jsonString, headers);
 		
 //		System.out.println(request.toString());
 //		System.out.println(request.getHeaders());
 		ResponseEntity<String> responseEntity=null;
-    	responseEntity = restTemplate.exchange( url,HttpMethod.POST, request , String.class );
-		System.out.println(responseEntity.toString());
-		String response = responseEntity.getBody();
-		
+		String response=null;
+		try{
+	    	responseEntity = restTemplate.exchange( url,HttpMethod.POST, request , String.class );
+			System.out.println(responseEntity.toString());
+			response = responseEntity.getBody();
+		} catch (HttpServerErrorException e){
+			logErrorAndRethrowException(e);
+		}
 		JSONObject user = new JSONObject(response);
 		LOGGER.error("Created new jira user:"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
 		return user.getString("key");
+	}
+	
+	private static void logErrorAndRethrowException(HttpServerErrorException e){
+		    LOGGER.error(e.getMessage());
+		    LOGGER.error(e.getResponseBodyAsString());
+		    LOGGER.error(e.getStatusCode().toString());
+		    throw e;
 	}
 
 	//task2
@@ -118,8 +139,11 @@ public class JiraAuthAndRegistrationUtils {
 			HttpEntity<String> request = getRequest(requestBody,false);
 
 			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
-			String stringResponse = response.getBody();
+			try{
+				restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
+			} catch (HttpServerErrorException e){
+				logErrorAndRethrowException(e);
+			}
 			LOGGER.error("finished with addUidPropertyToUser with upn:" + upn);
 //			JSONObject user = new JSONObject(stringResponse);
 //			System.out.println("--++>>"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
@@ -131,7 +155,7 @@ public class JiraAuthAndRegistrationUtils {
 //		curl  -i -u admin:admin -X POST --data "{\"name\": \"h3\"}" -H "Content-Type: application/json" http://localhost:8080/rest/api/2/group/user?groupname=jira-software-users
 
 		LOGGER.error("calling addUserToExternalUsersGroup with upn:" + upn);
-		String groupName="group-h1";
+		String groupName="DSP External Users";
 		String url = "http://localhost:8080/rest/api/2/group/user?groupname="+groupName;
 		JSONObject json = new JSONObject();
 		json.put("name",upn);
@@ -141,9 +165,11 @@ public class JiraAuthAndRegistrationUtils {
 		RestTemplate restTemplate = new RestTemplate();
 		System.out.println(request.toString());
 		System.out.println(request.getHeaders().toString());
+		try{
 		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		String stringResponse = response.getBody();
-		System.out.println(stringResponse);
+		} catch (HttpServerErrorException e){
+			logErrorAndRethrowException(e);
+		}
 		LOGGER.error("finished addUserToExternalUsersGroup with upn:" + upn);
 	}
 
@@ -162,13 +188,17 @@ public class JiraAuthAndRegistrationUtils {
 		String requestBody = json.toString();
 		HttpEntity<String> request = getRequest(requestBody,true);
 		RestTemplate restTemplate = new RestTemplate();
-		System.out.println(request.toString());
-		System.out.println(request.getHeaders().toString());
-		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+//		System.out.println(request.toString());
+//		System.out.println(request.getHeaders().toString());
+		ResponseEntity<String> response=null;
+		try{
+			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (HttpServerErrorException e){
+			logErrorAndRethrowException(e);
+		}
 		JSONObject createOrgResponse = new JSONObject(response.getBody());
 		LOGGER.error("finished createOrganisationinServiceDesk with ABN:" + abn + " id:" + createOrgResponse.getString("id"));
 		return createOrgResponse.getString("id");
-
 	}
 
 	
@@ -191,9 +221,11 @@ public class JiraAuthAndRegistrationUtils {
 		RestTemplate restTemplate = new RestTemplate();
 		System.out.println(request.toString());
 		System.out.println(request.getHeaders().toString());
-		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		String stringResponse = response.getBody();
-		System.out.println(stringResponse);
+		try{
+			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (HttpServerErrorException e){
+			logErrorAndRethrowException(e);
+		}
 		LOGGER.error("finished createCustomerInServiceDesk with email:" + email);
 	}
 
@@ -216,9 +248,14 @@ public class JiraAuthAndRegistrationUtils {
 		RestTemplate restTemplate = new RestTemplate();
 		System.out.println(request.toString());
 		System.out.println(request.getHeaders().toString());
-		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		String stringResponse = response.getBody();
-		System.out.println(stringResponse);
+		try{
+			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (HttpServerErrorException e){
+			logErrorAndRethrowException(e);
+		}
+
+//		String stringResponse = response.getBody();
+//		System.out.println(stringResponse);
 		LOGGER.error("finished addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName);
 	}
 
