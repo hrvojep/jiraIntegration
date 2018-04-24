@@ -61,11 +61,12 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Jira44CasAuthenticator.class);
 	public static Properties appProps = new Properties();		
 	static {		
-		String propertiesLocation="/tmp/jira/jira.properties";
+		//String propertiesLocation="/tmp/jira/jira.properties";
+		String propertiesLocation="/opt/atlassian/jira/conf/jira.properties";
 		try{
 			appProps.load(new FileInputStream(propertiesLocation));			
 			LOGGER.error("Read the properties from:" + propertiesLocation + " v1");
-
+			LOGGER.error("properties values:" + appProps.toString());
 		}catch (Exception e){
 			LOGGER.error("Cloud not read properties from:" + propertiesLocation);
 			LOGGER.error(e.getMessage(),e);
@@ -150,18 +151,29 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				//user does not exist. Register them and log them in on the fly.
 				else{
 					 LOGGER.error("Starting a workflow to create a new user in JIRA upn:'" + upn +"' email:'" + email + "'" );
+					 
+					 LOGGER.error("**-->Start createNewJiraUser:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.createNewJiraUser(upn,email);
+					 LOGGER.error("**-->Finish createNewJiraUser:" + upn + " :"+ email);
+					 
+					 LOGGER.error("**-->Start addUidPropertyToUser:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.addUidPropertyToUser(upn);
+					 LOGGER.error("**-->Finish addUidPropertyToUser:" + upn + " :"+ email);
+
+					 LOGGER.error("**-->Start addUserToExternalUsersGroup:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
+					 LOGGER.error("**-->Finish addUserToExternalUsersGroup:" + upn + " :"+ email);
+
+					 LOGGER.error("**-->Start createCustomerInServiceDesk:" + upn + " :"+ email);
 					 String newOrgId = JiraAuthAndRegistrationUtils.createOrganisationinServiceDesk(abn);
 					 JiraAuthAndRegistrationUtils.createCustomerInServiceDesk(email);
+					 LOGGER.error("**-->Finish createCustomerInServiceDesk:" + upn + " :"+ email);
+
+					 LOGGER.error("**-->Start addCustomerToOrganisation:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.addCustomerToOrganisation(newOrgId, upn);
-					 
-					 
-					 
-					 
+					 LOGGER.error("**-->Finish addCustomerToOrganisation:" + upn + " :"+ email + " :" + newOrgId);
+
 					 //final step, log in new user
-					 
 					 return logInExistingUser(upn,request);
 
 				}

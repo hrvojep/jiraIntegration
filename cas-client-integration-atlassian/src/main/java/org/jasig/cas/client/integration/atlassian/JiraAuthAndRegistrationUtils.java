@@ -24,6 +24,7 @@ public class JiraAuthAndRegistrationUtils {
 	private static String localJiraUrl = "http://localhost:8080";
 	private static String jiraUser=Jira44CasAuthenticator.appProps.getProperty("adminuser");
 	private static String jiraPassword = Jira44CasAuthenticator.appProps.getProperty("adminpassword");
+	private static String externalUserGroupName= Jira44CasAuthenticator.appProps.getProperty("externalUserGroupName");
 	private static String plainCreds = jiraUser+":" +jiraPassword;
 
 	public static boolean userExistsInJira(String userUpn) throws JSONException {
@@ -154,9 +155,10 @@ public class JiraAuthAndRegistrationUtils {
 	public static void addUserToExternalUsersGroup(String upn) throws Exception{
 //		curl  -i -u admin:admin -X POST --data "{\"name\": \"h3\"}" -H "Content-Type: application/json" http://localhost:8080/rest/api/2/group/user?groupname=jira-software-users
 
-		LOGGER.error("calling addUserToExternalUsersGroup with upn:" + upn);
-		String groupName="DSP External Users";
-		String url = "http://localhost:8080/rest/api/2/group/user?groupname="+groupName;
+		String url = "http://localhost:8080/rest/api/2/group/user?groupname="+externalUserGroupName;
+		LOGGER.error("calling addUserToExternalUsersGroup with upn:" + upn + " :url:" + url);
+		//String groupName="DSP External Users";
+		
 		JSONObject json = new JSONObject();
 		json.put("name",upn);
 		String requestBody = json.toString();
