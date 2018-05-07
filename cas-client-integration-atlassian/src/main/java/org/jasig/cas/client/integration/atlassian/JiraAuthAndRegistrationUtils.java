@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.atlassian.jira.util.json.JSONException;
@@ -25,6 +26,8 @@ public class JiraAuthAndRegistrationUtils {
 	private static String jiraUser=Jira44CasAuthenticator.appProps.getProperty("adminuser");
 	private static String jiraPassword = Jira44CasAuthenticator.appProps.getProperty("adminpassword");
 	private static String externalUserGroupName= Jira44CasAuthenticator.appProps.getProperty("externalUserGroupName");
+	private static String serviceDeskId= Jira44CasAuthenticator.appProps.getProperty("serviceDeskId");
+	
 	private static String plainCreds = jiraUser+":" +jiraPassword;
 
 	public static boolean userExistsInJira(String userUpn) throws JSONException {
@@ -68,14 +71,27 @@ public class JiraAuthAndRegistrationUtils {
 			userFound = false;
 		}
 		} catch (HttpClientErrorException e){
-		    LOGGER.error(e.getMessage());
-		    LOGGER.error(e.getResponseBodyAsString());
-		    LOGGER.error(e.getStatusCode().toString());
+			logErrorAndRethrowException(e,false);
 		}
 		return userFound;
 	}
 	
+	private static void logErrorAndRethrowException(HttpClientErrorException e,boolean throwException  ){
+	    LOGGER.error(e.getMessage());
+	    LOGGER.error(e.getResponseBodyAsString());
+	    LOGGER.error(e.getStatusCode().toString());
+	    if (throwException){
+	    	throw e;
+	    }
+	}
 	
+	
+	private static void logErrorAndRethrowException(RestClientException e){
+	    //LOGGER.error(e.getResponseBodyAsString());
+	    LOGGER.error(e.getMessage(), e);
+	    throw e;
+}
+
 	
 	public static String createNewJiraUser(String upn, String email) throws JSONException{
 		
@@ -112,20 +128,16 @@ public class JiraAuthAndRegistrationUtils {
 	    	responseEntity = restTemplate.exchange( url,HttpMethod.POST, request , String.class );
 			System.out.println(responseEntity.toString());
 			response = responseEntity.getBody();
-		} catch (HttpServerErrorException e){
-			logErrorAndRethrowException(e);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
 		}
 		JSONObject user = new JSONObject(response);
 		LOGGER.error("Created new jira user:"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
 		return user.getString("key");
 	}
 	
-	private static void logErrorAndRethrowException(HttpServerErrorException e){
-		    LOGGER.error(e.getMessage());
-		    LOGGER.error(e.getResponseBodyAsString());
-		    LOGGER.error(e.getStatusCode().toString());
-		    throw e;
-	}
+
+	
 
 	//task2
 	public static void addUidPropertyToUser(String upn) throws Exception{
@@ -142,8 +154,8 @@ public class JiraAuthAndRegistrationUtils {
 			RestTemplate restTemplate = new RestTemplate();
 			try{
 				restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
-			} catch (HttpServerErrorException e){
-				logErrorAndRethrowException(e);
+			} catch (HttpClientErrorException e){
+				logErrorAndRethrowException(e,true);
 			}
 			LOGGER.error("finished with addUidPropertyToUser with upn:" + upn);
 //			JSONObject user = new JSONObject(stringResponse);
@@ -169,8 +181,8 @@ public class JiraAuthAndRegistrationUtils {
 		System.out.println(request.getHeaders().toString());
 		try{
 		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		} catch (HttpServerErrorException e){
-			logErrorAndRethrowException(e);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
 		}
 		LOGGER.error("finished addUserToExternalUsersGroup with upn:" + upn);
 	}
@@ -190,13 +202,11 @@ public class JiraAuthAndRegistrationUtils {
 		String requestBody = json.toString();
 		HttpEntity<String> request = getRequest(requestBody,true);
 		RestTemplate restTemplate = new RestTemplate();
-//		System.out.println(request.toString());
-//		System.out.println(request.getHeaders().toString());
 		ResponseEntity<String> response=null;
 		try{
 			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		} catch (HttpServerErrorException e){
-			logErrorAndRethrowException(e);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
 		}
 		JSONObject createOrgResponse = new JSONObject(response.getBody());
 		LOGGER.error("finished createOrganisationinServiceDesk with ABN:" + abn + " id:" + createOrgResponse.getString("id"));
@@ -204,9 +214,32 @@ public class JiraAuthAndRegistrationUtils {
 	}
 
 	
+	public static void addOrganisationToServiceDesk(String orgId) throws Exception{
+	//		curl -u hrvoje2:hrvoje2 -X POST  -H "X-ExperimentalApi: opt-in" -H "Content-Type: application/json" http://localhost:8080/rest/servicedeskapi/servicedesk/1/organization -d'
+	//		{
+	//		    "organizationId": 9
+	//		}'
+		 
+		LOGGER.error("calling addOrganisationToServiceDesk with orgID:" + orgId );
+		String url = "http://localhost:8080/rest/servicedeskapi/servicedesk/"+ serviceDeskId +"/organization";
+		JSONObject json = new JSONObject();
+		json.put("organizationId",orgId);
+		String requestBody = json.toString();
+		HttpEntity<String> request = getRequest(requestBody,true);
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response=null;
+		try{
+			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (RestClientException e){
+			logErrorAndRethrowException(e);
+		}
+		LOGGER.error("finished addOrganisationToServiceDesk with orgID:" + orgId + " reponseCode:" + response.getStatusCode() );
+	}
+	
+	
 	//task5
 	//TODO add name instead of email to fullName
-	public static void createCustomerInServiceDesk(String email) throws Exception{
+	public static void createCustomerInServiceDesk(String email, String fullName) throws Exception{
 //		curl -v -i -X POST http://localhost:8080/rest/servicedeskapi/customer -H'Content-type: application/json' -H'Accept: application/json' -H'X-ExperimentalApi: opt-in' -uadmin:admin -d'
 //		{
 //		    "email": "fred@example.com",
@@ -216,7 +249,7 @@ public class JiraAuthAndRegistrationUtils {
 		String url = "http://localhost:8080/rest/servicedeskapi/customer";
 		JSONObject json = new JSONObject();
 		json.put("email", email);
-		json.put("fullName",email);
+		json.put("fullName",fullName);
 		String requestBody = json.toString();
 		HttpEntity<String> request = getRequest(requestBody,true);
 
@@ -225,8 +258,8 @@ public class JiraAuthAndRegistrationUtils {
 		System.out.println(request.getHeaders().toString());
 		try{
 			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		} catch (HttpServerErrorException e){
-			logErrorAndRethrowException(e);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
 		}
 		LOGGER.error("finished createCustomerInServiceDesk with email:" + email);
 	}
@@ -252,8 +285,8 @@ public class JiraAuthAndRegistrationUtils {
 		System.out.println(request.getHeaders().toString());
 		try{
 			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-		} catch (HttpServerErrorException e){
-			logErrorAndRethrowException(e);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
 		}
 
 //		String stringResponse = response.getBody();
