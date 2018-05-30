@@ -1434,6 +1434,38 @@
             <scope>compile</scope>
         </dependency>
 
+<!-- adding support for reactive 
+		<dependency>
+		    <groupId>org.springframework</groupId>
+		    <artifactId>spring-webflux</artifactId>
+		    <version>5.0.5.RELEASE</version>
+    	    <scope>compile</scope>
+		</dependency>
+
+		<dependency>
+		    <groupId>org.springframework</groupId>
+		    <artifactId>spring-web</artifactId>
+		    <version>5.0.5.RELEASE</version>
+    	    <scope>compile</scope>
+		</dependency>		
+		
+		<dependency>
+		    <groupId>io.projectreactor.ipc</groupId>
+		    <artifactId>reactor-netty</artifactId>
+		    <version>0.7.7.RELEASE</version>
+    	    <scope>compile</scope>
+		</dependency>
+		
+		<dependency>
+		    <groupId>org.springframework</groupId>
+		    <artifactId>spring-core</artifactId>
+		    <version>5.0.5.RELEASE</version>
+    	    <scope>compile</scope>
+	</dependency>
+
+adding support for reactive -->
+
+
     </dependencies>
     <repositories>
         <repository>

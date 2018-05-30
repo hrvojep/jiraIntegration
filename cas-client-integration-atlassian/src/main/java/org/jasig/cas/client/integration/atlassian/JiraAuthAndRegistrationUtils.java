@@ -1,7 +1,13 @@
 package org.jasig.cas.client.integration.atlassian;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Properties;
+
+import javax.xml.parsers.FactoryConfigurationError;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,63 +17,69 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+//import org.springframework.web.reactive.function.client.ClientResponse;
+//import org.springframework.web.reactive.function.client.WebClient;
+import org.xml.sax.SAXException;
 
 import com.atlassian.jira.util.json.JSONException;
 import com.atlassian.jira.util.json.JSONObject;
+
+import abn.lookup.AbnSearchResult;
+import abn.lookup.AbnSearchWSHttpGet;
+
+
+//import reactor.core.publisher.Mono;
 
 public class JiraAuthAndRegistrationUtils {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(JiraAuthAndRegistrationUtils.class);
 
-	private static String localJiraUrl = "http://localhost:8080";
-	private static String jiraUser=Jira44CasAuthenticator.appProps.getProperty("adminuser");
-	private static String jiraPassword = Jira44CasAuthenticator.appProps.getProperty("adminpassword");
-	private static String externalUserGroupName= Jira44CasAuthenticator.appProps.getProperty("externalUserGroupName");
-	private static String serviceDeskId= Jira44CasAuthenticator.appProps.getProperty("serviceDeskId");
+//	private static String localJiraUrl = "http://localhost:8080";
+	//localJiraRestUrl should be someting like http://localhost:8080/jira/rest
+	
+	private static Properties properties = Jira44CasAuthenticator.appProps;
+	
+	private static String localJiraRestUrl = properties.getProperty("localJiraRestUrl");
+	private static String jiraUser=properties.getProperty("adminuser");
+	private static String jiraPassword = properties.getProperty("adminpassword");
+	private static String externalUserGroupName= properties.getProperty("externalUserGroupName");
+	private static String serviceDeskId= properties.getProperty("serviceDeskId");
+	public static String logSessionAndCookieInfo = properties.getProperty("logSessionAndCookieInfo");
+	private static String abnLookupAuthGuid = properties.getProperty("abnLookupAuthGuid");
+	private static String resolveAbnToBusinessName = properties.getProperty("resolveAbnToBusinessName");
 	
 	private static String plainCreds = jiraUser+":" +jiraPassword;
 
-	public static boolean userExistsInJira(String userUpn) throws JSONException {
+	
+	
+	public static boolean userExistsInJira(String email) throws JSONException {
 		
 		boolean userFound=false;
-		LOGGER.error("checking if user exists:" + userUpn);
+		log("checking if user exists:" + email);
 		// String url = "http://localhost:8080/rest/api/2/user?username=h2";
-
-		String getUserUrlEndpoint = "/rest/api/2/user?username=";
-		String fullUrl = localJiraUrl + getUserUrlEndpoint + userUpn;
-
-//		String plainCreds = jiraUser+jiraPassword;
-//		byte[] plainCredsBytes = plainCreds.getBytes();
-//		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
-//		String base64Creds = new String(base64CredsBytes);
-//
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.add("Authorization", "Basic " + base64Creds);
-//		headers.setContentType(MediaType.APPLICATION_JSON);
-//		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+		//String url = localJiraRestUrl + 
+		//String getUserUrlEndpoint = "/rest/api/2/user?username=";
+		String fullUrl = localJiraRestUrl + "/api/2/user?username=" + email;
+		//String fullUrl = localJiraUrl + getUserUrlEndpoint + userUpn;
 
 		RestTemplate restTemplate = new RestTemplate();
-//		HttpEntity<String> request = new HttpEntity<String>(headers);
-		
 		HttpEntity<String> request = getRequest(null,false);
-
 		
-		LOGGER.error("making request with url:" + fullUrl + " requestBody:" + request.getBody() + " requestToString:" + request.toString());		
+		log("making request with url:" + fullUrl + " requestBody:" + request.getBody() + " requestToString:" + request.toString());		
 		try {
 		ResponseEntity<String> response = restTemplate.exchange(fullUrl, HttpMethod.GET, request, String.class);
 		String stringResponse = response.getBody();
 
-
 		JSONObject user = new JSONObject(stringResponse);
 		String userKey = user.getString("key");
 		if (userKey != null && userKey.trim().length() > 0) {
-			LOGGER.error("User:'" + userUpn + "' exists");
+			log("User:'" + email + "' exists");
 			userFound= true;
 		} else{
-			LOGGER.error("User:'" + userUpn + "' does not exist!");
+			log("User:'" + email + "' does not exist!");
 			userFound = false;
 		}
 		} catch (HttpClientErrorException e){
@@ -76,10 +88,31 @@ public class JiraAuthAndRegistrationUtils {
 		return userFound;
 	}
 	
+	
+//	public static void getUserAsync() throws Exception {
+//		 String url = "http://localhost:8080/rest/api/2/user?username=h2";
+//		 System.out.println("Starting");
+//
+//		 Mono<ClientResponse> result = WebClient.create().get()
+//		        .uri(url)
+//		        .header(HttpHeaders.AUTHORIZATION, "Basic " + getCreds())
+//		        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+//		        .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+//		        .exchange();
+//	 
+//		 result.flatMap(res2 -> res2.bodyToMono(String.class)).subscribe(JiraAuthAndRegistrationUtils::handleResponse);
+//		 System.out.println("Finished");
+//	}
+
+//	 private static void handleResponse(String s) {
+//	      System.out.println("handle response:" + s);
+//	  }
+
+	
 	private static void logErrorAndRethrowException(HttpClientErrorException e,boolean throwException  ){
-	    LOGGER.error(e.getMessage());
-	    LOGGER.error(e.getResponseBodyAsString());
-	    LOGGER.error(e.getStatusCode().toString());
+	    log(e.getMessage());
+	    log(e.getResponseBodyAsString());
+	    log(e.getStatusCode().toString());
 	    if (throwException){
 	    	throw e;
 	    }
@@ -87,41 +120,28 @@ public class JiraAuthAndRegistrationUtils {
 	
 	
 	private static void logErrorAndRethrowException(RestClientException e){
-	    //LOGGER.error(e.getResponseBodyAsString());
-	    LOGGER.error(e.getMessage(), e);
+	    log(((HttpStatusCodeException) e).getResponseBodyAsString());
+	    log(e.getMessage(), e);
 	    throw e;
 }
 
 	
 	public static String createNewJiraUser(String upn, String email) throws JSONException{
 		
-		String url = "http://localhost:8080/rest/api/2/user";
+		//String url = "http://localhost:8080/rest/api/2/user";
+		String url = localJiraRestUrl + "/api/2/user";
 		//String url = "https://hookb.in/v0PPBPX0";
 		
-		LOGGER.error("registering new user upn:'" + upn +"' email:'" + email + "'");
-//		byte[] plainCredsBytes = plainCreds.getBytes();
-//		byte[] base64CredsBytes =Base64.getEncoder().encode(plainCredsBytes);
-//		String base64Creds = new String(base64CredsBytes);
-//
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.add("Authorization", "Basic " + base64Creds);
-//		headers.setContentType(MediaType.APPLICATION_JSON);
-//		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+		log("registering new user upn:'" + upn +"' email:'" + email + "'" + " with url:" + url);
 		
 		RestTemplate restTemplate = new RestTemplate();
 		JSONObject json = new JSONObject();
 		json.put("name", upn);
-		//json.put("password", "h"+randomId);
 		json.put("emailAddress", email);
 		json.put("displayName", email);
 		
 		String requestBody = json.toString();
 		HttpEntity<String> request = getRequest(requestBody,false);
-
-		//HttpEntity<String> request = new HttpEntity<String>(jsonString, headers);
-		
-//		System.out.println(request.toString());
-//		System.out.println(request.getHeaders());
 		ResponseEntity<String> responseEntity=null;
 		String response=null;
 		try{
@@ -132,22 +152,21 @@ public class JiraAuthAndRegistrationUtils {
 			logErrorAndRethrowException(e,true);
 		}
 		JSONObject user = new JSONObject(response);
-		LOGGER.error("Created new jira user:"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
+		log("Created new jira user:"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
 		return user.getString("key");
 	}
-	
-
-	
 
 	//task2
-	public static void addUidPropertyToUser(String upn) throws Exception{
+	public static void addUidPropertyToUser(String email) throws Exception{
    		//sample request via curl    
 		//curl -i -X PUT http://localhost:8080/rest/api/2/user/properties/uid?username=h2 -H'Content-type: application/json' -H'Accept: application/json' -uadmin:admin -d'"xxxxh2"'
 			
-			LOGGER.error("calling addUidPropertyToUser with upn:" + upn);
-			String url = "http://localhost:8080/rest/api/2/user/properties/uid?username="+upn;
+			//String url = "http://localhost:8080/rest/api/2/user/properties/uid?username="+upn;
+			String url = localJiraRestUrl +"/api/2/user/properties/uid?username="+email;
+			
+			log("calling addUidPropertyToUser with upn:" + email + " with url:" + url);
 			JSONObject json = new JSONObject();
-			json.put("",upn);
+			json.put("",email);
 			String requestBody = json.toString();
 			HttpEntity<String> request = getRequest(requestBody,false);
 
@@ -157,20 +176,16 @@ public class JiraAuthAndRegistrationUtils {
 			} catch (HttpClientErrorException e){
 				logErrorAndRethrowException(e,true);
 			}
-			LOGGER.error("finished with addUidPropertyToUser with upn:" + upn);
-//			JSONObject user = new JSONObject(stringResponse);
-//			System.out.println("--++>>"+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
-			
+			log("finished with addUidPropertyToUser with upn:" + email);
 	}
 
 	//task3
 	public static void addUserToExternalUsersGroup(String upn) throws Exception{
 //		curl  -i -u admin:admin -X POST --data "{\"name\": \"h3\"}" -H "Content-Type: application/json" http://localhost:8080/rest/api/2/group/user?groupname=jira-software-users
 
-		String url = "http://localhost:8080/rest/api/2/group/user?groupname="+externalUserGroupName;
-		LOGGER.error("calling addUserToExternalUsersGroup with upn:" + upn + " :url:" + url);
-		//String groupName="DSP External Users";
-		
+		//String url = "http://localhost:8080/rest/api/2/group/user?groupname="+externalUserGroupName;
+		String url = localJiraRestUrl + "/api/2/group/user?groupname="+externalUserGroupName;
+		log("calling addUserToExternalUsersGroup with upn:" + upn + " :url:" + url);
 		JSONObject json = new JSONObject();
 		json.put("name",upn);
 		String requestBody = json.toString();
@@ -184,21 +199,42 @@ public class JiraAuthAndRegistrationUtils {
 		} catch (HttpClientErrorException e){
 			logErrorAndRethrowException(e,true);
 		}
-		LOGGER.error("finished addUserToExternalUsersGroup with upn:" + upn);
+		log("finished addUserToExternalUsersGroup with upn:" + upn);
 	}
 
 	
+	
+	public static String resolveAbnToBusinessName(String abn) throws Exception {		
+		String resolvedBusinessName="";
+		if (resolveAbnToBusinessName!=null && resolveAbnToBusinessName.equalsIgnoreCase("true")){
+			AbnSearchResult result = AbnSearchWSHttpGet.searchByABN(abnLookupAuthGuid, abn, false);
+			if (result.isException()){
+				log("ABN search for ABN [" + abn + "] returned exception [" + result.getExceptionDescription() + "]");
+				throw new Exception("Could not lookup ABN:" + abn + " " + result.getExceptionDescription());
+			}
+			resolvedBusinessName =  result.getOrganisationName();
+		} else{
+			//we can't resolve abn to business name, just return abn
+			resolvedBusinessName = abn;
+		}
+		return resolvedBusinessName;
+	}
+	
+	
 	//task4
 	//ISSUE: ORG not visible in serviceDesk Web, but is via API, can add it manually in browser
-	public static String createOrganisationinServiceDesk(String abn) throws Exception{
+	public static String createOrganisationinServiceDesk(String businessName,String abn) throws Exception{
 		//create organization
 		//curl -v -i -X POST http://localhost:8080/rest/servicedeskapi/organization -H'Content-type: application/json' -H'Accept: application/json' 
 		//-H'X-ExperimentalApi: opt-in' -uadmin:admin -d'{"name": "test organization 2"}'
 
-		LOGGER.error("calling createOrganisationinServiceDesk with ABN:" + abn);
-		String url = "http://localhost:8080/rest/servicedeskapi/organization";
+		//String url = "http://localhost:8080/rest/servicedeskapi/organization";
+		
+		
+		String url = localJiraRestUrl + "/servicedeskapi/organization";
+		log("calling createOrganisationinServiceDesk with ABN:" + abn + " businessName:" + businessName + " with url:" + url);
 		JSONObject json = new JSONObject();
-		json.put("name",abn);
+		json.put("name",businessName);
 		String requestBody = json.toString();
 		HttpEntity<String> request = getRequest(requestBody,true);
 		RestTemplate restTemplate = new RestTemplate();
@@ -209,7 +245,7 @@ public class JiraAuthAndRegistrationUtils {
 			logErrorAndRethrowException(e,true);
 		}
 		JSONObject createOrgResponse = new JSONObject(response.getBody());
-		LOGGER.error("finished createOrganisationinServiceDesk with ABN:" + abn + " id:" + createOrgResponse.getString("id"));
+		log("finished createOrganisationinServiceDesk with ABN:" + abn + " id:" + createOrgResponse.getString("id"));
 		return createOrgResponse.getString("id");
 	}
 
@@ -220,8 +256,10 @@ public class JiraAuthAndRegistrationUtils {
 	//		    "organizationId": 9
 	//		}'
 		 
-		LOGGER.error("calling addOrganisationToServiceDesk with orgID:" + orgId );
-		String url = "http://localhost:8080/rest/servicedeskapi/servicedesk/"+ serviceDeskId +"/organization";
+		//String url = "http://localhost:8080/rest/servicedeskapi/servicedesk/"+ serviceDeskId +"/organization";
+		String url = localJiraRestUrl + "/servicedeskapi/servicedesk/"+ serviceDeskId +"/organization";
+
+		log("calling addOrganisationToServiceDesk with orgID:" + orgId + " with url:" + url);
 		JSONObject json = new JSONObject();
 		json.put("organizationId",orgId);
 		String requestBody = json.toString();
@@ -233,7 +271,7 @@ public class JiraAuthAndRegistrationUtils {
 		} catch (RestClientException e){
 			logErrorAndRethrowException(e);
 		}
-		LOGGER.error("finished addOrganisationToServiceDesk with orgID:" + orgId + " reponseCode:" + response.getStatusCode() );
+		log("finished addOrganisationToServiceDesk with orgID:" + orgId + " reponseCode:" + response.getStatusCode() );
 	}
 	
 	
@@ -245,8 +283,9 @@ public class JiraAuthAndRegistrationUtils {
 //		    "email": "fred@example.com",
 //		    "fullName": "Fred F. User"
 //		}'
-		LOGGER.error("calling createCustomerInServiceDesk with email:" + email);
-		String url = "http://localhost:8080/rest/servicedeskapi/customer";
+		//String url = "http://localhost:8080/rest/servicedeskapi/customer";
+		String url = localJiraRestUrl + "/servicedeskapi/customer";
+		log("calling createCustomerInServiceDesk with email:" + email + " with url:" + url);
 		JSONObject json = new JSONObject();
 		json.put("email", email);
 		json.put("fullName",fullName);
@@ -261,7 +300,7 @@ public class JiraAuthAndRegistrationUtils {
 		} catch (HttpClientErrorException e){
 			logErrorAndRethrowException(e,true);
 		}
-		LOGGER.error("finished createCustomerInServiceDesk with email:" + email);
+		log("finished createCustomerInServiceDesk with email:" + email);
 	}
 
 	
@@ -275,34 +314,25 @@ public class JiraAuthAndRegistrationUtils {
 //		        "fred@example.com"        
 //		    ]
 //		}'
-		LOGGER.error("calling addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName);
-		String url = "http://localhost:8080/rest/servicedeskapi/organization/"+ organisationId +"/user";
+		//String url = "http://localhost:8080/rest/servicedeskapi/organization/"+ organisationId +"/user";
+		String url = localJiraRestUrl + "/servicedeskapi/organization/"+ organisationId +"/user";
+		log("calling addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName + " with url: " + url);		
 		String requestBody="{\"usernames\": [\""+ userName +"\"]}";
-		System.out.println("Body:" + requestBody);
 		HttpEntity<String> request = getRequest(requestBody,true);
 		RestTemplate restTemplate = new RestTemplate();
-		System.out.println(request.toString());
-		System.out.println(request.getHeaders().toString());
 		try{
 			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
 		} catch (HttpClientErrorException e){
 			logErrorAndRethrowException(e,true);
 		}
-
-//		String stringResponse = response.getBody();
-//		System.out.println(stringResponse);
-		LOGGER.error("finished addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName);
+		log("finished addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName);
 	}
 
 	
 	
 	private static HttpEntity<String>  getRequest(String body, boolean addExperimentalHeader){
-		byte[] plainCredsBytes = plainCreds.getBytes();
-		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
-		String base64Creds = new String(base64CredsBytes);
-
 		HttpHeaders headers = new HttpHeaders();
-		headers.add("Authorization", "Basic " + base64Creds);
+		headers.add("Authorization", "Basic " + getCreds());
 		if (addExperimentalHeader){
 			headers.add("X-ExperimentalApi", "opt-in");			
 		}
@@ -317,13 +347,137 @@ public class JiraAuthAndRegistrationUtils {
 		}
 		return request;
 	} 
-
-
 	
-	public static String generateRandomId(){
-		long millis = System.currentTimeMillis() % 1000;
-		return "ucxek" + millis;
+	
+	
+	public static void createDspAndContactInInsight(String abn, String businessName, String contactName, String contactEmail) throws Exception{
+		String dspCompanyId = createOrganisationInInsight(abn,businessName);
+		createContactInInsight(dspCompanyId,contactName,contactEmail);
+	}
+	
+	private static String createOrganisationInInsight(String abn,String businessName) throws Exception{
+//		curl -v -i -X POST http://localhost:8080/jira/rest/insight/1.0/object/create -H'Content-type: application/json' -H'Accept: application/json' -H'X-ExperimentalApi: opt-in' -uadmin:admin -d'
+//		{
+//		    "objectTypeId": 3,
+//		    "attributes": [{
+//		        "objectTypeAttributeId": 45,
+//		        "objectAttributeValues": [{
+//		            "value": "H enterprise 3"
+//		        }]
+//		    },
+//		    {
+//		        "objectTypeAttributeId": 49,
+//		        "objectAttributeValues": [{
+//		            "value": "1213546546"
+//		        }]
+//		    },
+//		    {
+//		        "objectTypeAttributeId": 52,
+//		        "objectAttributeValues": [{
+//		            "value": "470"
+//		        }]
+//
+//		    }
+//		    ]
+//		}'
+		
+		log("calling createOrganisationInInsight with businessName:" + businessName + " abn:" + abn);
+	
+		String objectTypeIdOrg="3";
+		String objectTypeAttributeIdOrgName="45";
+		String objectTypeAttributeIdOrgAbn="49";
+		String requestBody="{\"objectTypeId\": "+ objectTypeIdOrg +", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgName+", \"objectAttributeValues\": [{\"value\": \""+businessName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgAbn+", \"objectAttributeValues\": [{\"value\": \""+abn+"\"}] } ] }'";
+		String url = localJiraRestUrl + "/insight/1.0/object/create";
+
+		HttpEntity<String> request = getRequest(requestBody,true);
+
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response=null;
+		try{
+			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
+		}
+		String stringResponse = response.getBody();
+		System.out.println(stringResponse);
+
+		JSONObject org = new JSONObject(stringResponse);
+		int orgId=org.getInt("id");
+		
+		log("finished createOrganisationInInsight with businessName:" + businessName + " abn:" + abn + " .Create DSP with id:" + orgId);
+
+		return String.valueOf(orgId);
 	}
 
+	
+	private static void createContactInInsight(String contactCompanyId, String contactName, String contactEmail) throws Exception {
+//		#create contact object for DSP object, last field is the company id (481) from Elle.contact.json, this is the id: you get from create company.
+//		curl -v -i -X POST http://localhost:8080/jira/rest/insight/1.0/object/create -H'Content-type: application/json' -H'Accept: application/json' -H'X-ExperimentalApi: opt-in' -uadmin:admin -d'
+//		{
+//		    "objectTypeId": 7,
+//		    "attributes": [{
+//		        "objectTypeAttributeId": 100,
+//		        "objectAttributeValues": [{
+//		            "value": "test2@test.com"
+//		        }]
+//		    },
+//		    {
+//		        "objectTypeAttributeId": 26,
+//		        "objectAttributeValues": [{
+//		            "value": "test three"
+//		        }]
+//		    },
+//		    {
+//		        "objectTypeAttributeId": 96,
+//		        "objectAttributeValues": [{
+//		            "value": "481"
+//		        }]
+//		    }
+//		    ]
+//		}'	
+		
+		log("calling createContactInInsight with companyId:" + contactCompanyId + " contactname:" + contactName + " contactEmail:" + contactEmail);
+		String objectTypeIdContact="7";
+		String objectTypeAttributeIdContactEmail="100";
+		String objectTypeAttributeIdContactName="26";
+		String objectTypeAttributeIdContactCompanyId="96";
+		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] } ] }'";
+			
+		String url = "http://localhost:8080/jira/rest/insight/1.0/object/create";
+		
+		
+		HttpEntity<String> request = getRequest(requestBody,true);
 
+		RestTemplate restTemplate = new RestTemplate();
+		System.out.println(request.toString());
+		System.out.println(request.getHeaders().toString());
+		ResponseEntity<String> response=null;
+		try{
+			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+		} catch (HttpClientErrorException e){
+			logErrorAndRethrowException(e,true);
+		}
+		String stringResponse = response.getBody();
+		JSONObject org = new JSONObject(stringResponse);
+		int contactId=org.getInt("id");
+		log("finished createContactInInsight with companyId:" + contactCompanyId + " contactname:" + contactName + " contactEmail:" + contactEmail + " contactId:" + contactId);
+	}	
+	
+	
+
+	private static void log(String logMessage){
+		LOGGER.error(logMessage);
+	}
+	
+	private static void log(String logMessage, Exception ex){
+		LOGGER.error(logMessage, ex);
+	}
+
+	private static String getCreds(){
+		byte[] plainCredsBytes = plainCreds.getBytes();
+		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
+		String base64Creds = new String(base64CredsBytes);
+		return base64Creds;
+		
+	}
 }
