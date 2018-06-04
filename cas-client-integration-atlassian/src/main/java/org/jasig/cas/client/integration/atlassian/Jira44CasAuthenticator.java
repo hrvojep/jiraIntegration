@@ -157,9 +157,6 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 //					 log("**-->Finish createNewJiraUser:" + upn + " :"+ email);
 					 
 
-//					 log("**-->Start addUserToExternalUsersGroup:" + upn + " :"+ email);
-//					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
-//					 log("**-->Finish addUserToExternalUsersGroup:" + upn + " :"+ email);
 
 					 log("**-->Resolving abn to business name:" + abn);
 					 String businessName = JiraAuthAndRegistrationUtils.resolveAbnToBusinessName(abn);
@@ -172,6 +169,10 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 
 					 log("**-->Start createCustomerInServiceDesk:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.createCustomerInServiceDesk(email,fullName);
+					 
+					 log("**-->Start addUserToExternalUsersGroup:" + upn + " :"+ email);
+					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
+					 log("**-->Finish addUserToExternalUsersGroup:" + upn + " :"+ email);
 					 
 					 log("**-->Start addCustomerToOrganisation:" + upn + " :"+ email);
 					 JiraAuthAndRegistrationUtils.addCustomerToOrganisation(newOrgId, email);

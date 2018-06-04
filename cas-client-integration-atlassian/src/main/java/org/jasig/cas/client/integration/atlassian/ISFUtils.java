@@ -65,50 +65,17 @@ public class ISFUtils {
 				familyName = claimValue;
 			}
 		}
-
-		
 		return new ISFJiraIdentifiers(upn, email, abn,givenName,familyName);
 	}
+
 	
-	private static void extractISFUserName(String xmlString) throws Exception{
-	    String givenName;
-	    String familyName;
-
-	    
-		DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-		InputSource src = new InputSource(new StringReader(xmlString));
-		Document doc = builder.parse(src);
-
-		Element element=  doc.getElementById("claims");//getElementsByTagName("claim").getLength();
-	    NodeList nodeList = doc.getElementsByTagName("claims").item(0).getChildNodes();
-	    int claimSize =  nodeList.getLength();
-	    
-	    for (int i=0; i<claimSize;i++){
-			System.out.println(nodeList.item(i));
-			Node claimNode =  nodeList.item(i);
-			
-			String claimType = claimNode.getChildNodes().item(0).getTextContent();
-			String claimValue = claimNode.getChildNodes().item(1).getTextContent();
-			
-			if (claimType.contains("DisplayGivenName")){
-				givenName = claimValue;
-			}
-			if (claimValue.contains("DisplayFamilyName")){
-				familyName = claimValue;
-			}
-		}
-	    
-	    System.out.println("test");
-		
-	}
 	
 	public static String encodeToBase64(){
-		String upn ="one1@test.com.au";
-		String email="one12@test.com.au";
-		String abn="51824753551";
-		String name="one";
-		String surname="one";
-
+		String upn ="one7@test.com.au";
+		String email="one7@test.com.au";
+		String abn="51824753554";
+		String name="seven";
+		String surname="seven";
 		
 		String plainTextGID="<?xml version=\"1.0\" encoding=\"us-ascii\"?><uid version=\"3.2\" xmlns=\"urn:xml-gov-au:ato:uid-isf:3.2\">"
 				+ "<authenticationType>2</authenticationType><upn>"+upn+"</upn><isfHops>10.19.200.102,10.196.66.255:3400,10.196.67.133:81,127.0.0.1:3500</isfHops><sessionId>8fced42cdbdf4c82880fad095f4b6d23</sessionId><requestId>0a095dafad6049c890fce9a7f79dc668</requestId><gateway>5</gateway><timeStamp>2018-03-16T10:29:08+11:00</timeStamp><abn>"+abn+"</abn><subjectDN>CN=PERF USER 90210, O=21173719971, dnQ=90212</subjectDN><credentialType>1</credentialType><email>"+email+"</email><oamCache /><claims><claim><claimType>urn://au.gov.ato/authentication/LastLoggedInDateTime</claimType><value>0017-06-05T08:12:10Z</value></claim><claim><claimType>urn://au.gov.ato/authentication/DisplayGivenName</claimType><value>"+name+"</value></claim><claim><claimType>urn://au.gov.ato/authentication/DisplayFamilyName</claimType><value>"+surname+"</value></claim><claim><claimType>urn://au.gov.ato/authentication/BusinessClientCount</claimType><value>0</value></claim><claim><claimType>urn://au.gov.ato/authentication/OriginalLoginChannel</claimType><value>BrowserSaml</value></claim><claim><claimType>urn://au.gov.ato/authentication/CertificateFingerprint</claimType><value>2117371997190212211737199719021297190212</value></claim><claim><claimType>urn://au.gov.ato/authentication/AbrPersonId</claimType><value>90212</value></claim><claim><claimType>urn://au.gov.ato/authentication/CurrentIdentityProvider</claimType><value>VanGuardSamlBinding</value></claim></claims></uid>";
@@ -128,7 +95,7 @@ public class ISFUtils {
 
 	public static void printIdentifiers(String base64String ) throws Exception{
 		String isfTokenAsXMLString = getXMLFromBase64String(base64String);
-		System.out.println(isfTokenAsXMLString);
+		//System.out.println(isfTokenAsXMLString);
 		System.out.println();
 		//extractISFUserName(isfTokenAsXMLString);
 		ISFJiraIdentifiers identifiers=getISFIdentifiers(isfTokenAsXMLString);

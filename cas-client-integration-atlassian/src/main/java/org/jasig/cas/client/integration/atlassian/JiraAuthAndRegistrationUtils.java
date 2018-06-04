@@ -1,13 +1,8 @@
 package org.jasig.cas.client.integration.atlassian;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Properties;
-
-import javax.xml.parsers.FactoryConfigurationError;
-import javax.xml.parsers.ParserConfigurationException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,14 +11,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-//import org.springframework.web.reactive.function.client.ClientResponse;
-//import org.springframework.web.reactive.function.client.WebClient;
-import org.xml.sax.SAXException;
 
+import com.atlassian.jira.util.json.JSONArray;
 import com.atlassian.jira.util.json.JSONException;
 import com.atlassian.jira.util.json.JSONObject;
 
@@ -50,6 +44,19 @@ public class JiraAuthAndRegistrationUtils {
 	public static String logSessionAndCookieInfo = properties.getProperty("logSessionAndCookieInfo");
 	private static String abnLookupAuthGuid = properties.getProperty("abnLookupAuthGuid");
 	private static String resolveAbnToBusinessName = properties.getProperty("resolveAbnToBusinessName");
+	
+	private static String objectTypeIdOrg = properties.getProperty("objectTypeIdOrg");
+	private static String objectTypeAttributeIdOrgName = properties.getProperty("objectTypeAttributeIdOrgName");
+	private static String objectTypeAttributeIdOrgAbn = properties.getProperty("objectTypeAttributeIdOrgAbn");
+	
+	private static String objectTypeIdContact = properties.getProperty("objectTypeIdContact");
+	private static String objectTypeAttributeIdContactEmail = properties.getProperty("objectTypeAttributeIdContactEmail");
+	private static String objectTypeAttributeIdContactName = properties.getProperty("objectTypeAttributeIdContactName");
+	private static String objectTypeAttributeIdContactCompanyId = properties.getProperty("objectTypeAttributeIdContactCompanyId");
+	
+	private static String dspObjectSchemaId = properties.getProperty("dspObjectSchemaId");
+	
+	
 	
 	private static String plainCreds = jiraUser+":" +jiraPassword;
 
@@ -120,9 +127,10 @@ public class JiraAuthAndRegistrationUtils {
 	
 	
 	private static void logErrorAndRethrowException(RestClientException e){
-	    log(((HttpStatusCodeException) e).getResponseBodyAsString());
 	    log(e.getMessage(), e);
-	    throw e;
+		log(((HttpClientErrorException) e).getResponseBodyAsString());
+		log(((HttpClientErrorException) e).getStatusCode().toString());
+		throw e;
 }
 
 	
@@ -380,34 +388,66 @@ public class JiraAuthAndRegistrationUtils {
 //		    }
 //		    ]
 //		}'
+		String insightDSPid=null;
+
+		//check if DSP exists in Insight
+		insightDSPid = getRegisteredDSPidFromInsight(abn);
+
+		// if DSP doesn't exist register it
+		if (insightDSPid == null){
+			log("calling createOrganisationInInsight with businessName:" + businessName + " abn:" + abn);
+			String requestBody="{\"objectTypeId\": "+ objectTypeIdOrg +", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgName+", \"objectAttributeValues\": [{\"value\": \""+businessName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgAbn+", \"objectAttributeValues\": [{\"value\": \""+abn+"\"}] } ] }'";
+			String url = localJiraRestUrl + "/insight/1.0/object/create";
+			HttpEntity<String> request = getRequest(requestBody,true);
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<String> response=null;
+			try{
+				response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);		
+			} catch (HttpClientErrorException e){
+				logErrorAndRethrowException(e);
+			}
+			String stringResponse = response.getBody();
+			JSONObject org = new JSONObject(stringResponse);
+			int orgId=org.getInt("id");		
+			log("finished createOrganisationInInsight with businessName:" + businessName + " abn:" + abn + " .Create DSP with id:" + orgId);
+			insightDSPid = String.valueOf(orgId);
+		}
+		return insightDSPid;
 		
-		log("calling createOrganisationInInsight with businessName:" + businessName + " abn:" + abn);
+	}
 	
-		String objectTypeIdOrg="3";
-		String objectTypeAttributeIdOrgName="45";
-		String objectTypeAttributeIdOrgAbn="49";
-		String requestBody="{\"objectTypeId\": "+ objectTypeIdOrg +", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgName+", \"objectAttributeValues\": [{\"value\": \""+businessName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgAbn+", \"objectAttributeValues\": [{\"value\": \""+abn+"\"}] } ] }'";
-		String url = localJiraRestUrl + "/insight/1.0/object/create";
+	
+	private static String getRegisteredDSPidFromInsight(String abn) throws Exception {
+		//curl  -X GET http://localhost:8080/jira/rest/insight/1.0/iql/objects?objectSchemaId=2&iql=objecttypeid=3%20AND%20ABN=51824753554 -H'Content-type: application/json' -H'Accept: application/json' -H'X-ExperimentalApi: opt-in' -uadmin:admin | jq '.'
 
-		HttpEntity<String> request = getRequest(requestBody,true);
+		log("Strarting getRegisteredDSPidFromInsight with abn:" + abn);
+		String registeredDSPidFromInsight=null;
+		String url = localJiraRestUrl + "/insight/1.0/iql/objects?objectSchemaId="+dspObjectSchemaId+"&iql=objecttypeid="+objectTypeIdOrg+" AND ABN="+ abn;
 
+		HttpEntity<String> request = getRequest(null,true);
 		RestTemplate restTemplate = new RestTemplate();
 		ResponseEntity<String> response=null;
 		try{
-			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+			response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 		} catch (HttpClientErrorException e){
-			logErrorAndRethrowException(e,true);
+			logErrorAndRethrowException(e);
 		}
+
 		String stringResponse = response.getBody();
-		System.out.println(stringResponse);
-
-		JSONObject org = new JSONObject(stringResponse);
-		int orgId=org.getInt("id");
-		
-		log("finished createOrganisationInInsight with businessName:" + businessName + " abn:" + abn + " .Create DSP with id:" + orgId);
-
-		return String.valueOf(orgId);
+		//you get a pile of JSON back, assumpiton is if abn appears mulitple times then the DSP is already registered. 
+		int countOfAppearances = StringUtils.countOccurrencesOf(stringResponse, abn);
+		if (countOfAppearances > 1){
+			JSONObject org = new JSONObject(stringResponse);
+			JSONArray arrObj = org.getJSONArray("objectEntries");
+			JSONObject firstElement = (JSONObject)arrObj.get(0);
+			Integer orgId = firstElement.getInt("id");
+			registeredDSPidFromInsight=String.valueOf(orgId);
+		}
+		log("finished getRegisteredDSPidFromInsight with abn:" + abn + " registeredDSPidFromInsight:" + registeredDSPidFromInsight + " countOfAppearances:" + countOfAppearances);
+		return registeredDSPidFromInsight;
 	}
+	
+	
 
 	
 	private static void createContactInInsight(String contactCompanyId, String contactName, String contactEmail) throws Exception {
@@ -437,26 +477,27 @@ public class JiraAuthAndRegistrationUtils {
 //		}'	
 		
 		log("calling createContactInInsight with companyId:" + contactCompanyId + " contactname:" + contactName + " contactEmail:" + contactEmail);
-		String objectTypeIdContact="7";
-		String objectTypeAttributeIdContactEmail="100";
-		String objectTypeAttributeIdContactName="26";
-		String objectTypeAttributeIdContactCompanyId="96";
+
+		//with companyID
+		//String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] } ] }'";
+
+		//without companyID
 		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] } ] }'";
-			
-		String url = "http://localhost:8080/jira/rest/insight/1.0/object/create";
-		
-		
+		//without companyID
+		//String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }] }'";
+		String url = localJiraRestUrl + "/insight/1.0/object/create";
 		HttpEntity<String> request = getRequest(requestBody,true);
 
 		RestTemplate restTemplate = new RestTemplate();
-		System.out.println(request.toString());
-		System.out.println(request.getHeaders().toString());
+		log(request.toString());
+		log(request.getHeaders().toString());
 		ResponseEntity<String> response=null;
 		try{
 			response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
 		} catch (HttpClientErrorException e){
-			logErrorAndRethrowException(e,true);
+			logErrorAndRethrowException(e);
 		}
+		
 		String stringResponse = response.getBody();
 		JSONObject org = new JSONObject(stringResponse);
 		int contactId=org.getInt("id");
