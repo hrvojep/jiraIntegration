@@ -1,5 +1,7 @@
 package org.jasig.cas.client.integration.atlassian;
 
+import org.springframework.util.StringUtils;
+
 public class ISFJiraIdentifiers {
 
 	private String upn;
@@ -7,7 +9,12 @@ public class ISFJiraIdentifiers {
 	private String abn;
 	private String givenName;
 	private String familyName;
+	private String abrPersonId;
+	private String jiraUserName;
 
+	public String getAbrPersonId() {
+		return abrPersonId;
+	}
 
 	public String getUpn() {
 		return upn;
@@ -34,19 +41,29 @@ public class ISFJiraIdentifiers {
 		return getGivenName() + " " + getFamilyName();
 	}
 	
-	public ISFJiraIdentifiers(String upn, String email, String abn, String givenName, String familyName) {
+	public String getJiraUserName(){
+		return jiraUserName;
+	}
+	
+	public ISFJiraIdentifiers(String upn, String email, String abn, String givenName, String familyName, String abrPersonId) {
 		super();
-		this.upn = upn;
-		this.email = email;
-		this.abn = abn;
-		this.givenName = givenName;
-		this.familyName = familyName;
+		this.upn = StringUtils.trimAllWhitespace(upn);
+		this.email = StringUtils.trimAllWhitespace(email);
+		this.abn = StringUtils.trimAllWhitespace(abn);
+		this.givenName = StringUtils.trimAllWhitespace(givenName); 
+		this.familyName = StringUtils.trimAllWhitespace(familyName);
+		this.abrPersonId= StringUtils.trimAllWhitespace(abrPersonId);
+		this.jiraUserName = abrPersonId + "-" + abn;
 	}
 
 	@Override
 	public String toString() {
 		return "ISFJiraIdentifiers [upn=" + upn + ", email=" + email + ", abn=" + abn + ", givenName=" + givenName
-				+ ", familyName=" + familyName + "]";
+				+ ", familyName=" + familyName + ", abrPersonId=" + abrPersonId + ", jiraUserName=" + jiraUserName
+				+ "]";
 	}
+
+
+	
 
 }

@@ -51,31 +51,14 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	private static final String ISF_HEADER = "isf8uid";
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(Jira44CasAuthenticator.class);
-	public static Properties appProps = new Properties();		
-
-	
-	static {		
-		String propertiesLocation="/opt/atlassian/jira/conf/jira.properties";
-		try{
-			appProps.load(new FileInputStream(propertiesLocation));
-			String printProperties = appProps.getProperty("printProperties");
-			if (printProperties !=null && printProperties.equalsIgnoreCase("true")){
-				log("Read the properties from:" + propertiesLocation + " v1");
-				log("properties values:" + appProps.toString());
-			}
-		}catch (Exception e){
-			log("Cloud not read properties from:" + propertiesLocation);
-			log(e.getMessage(),e);
-		}
-	}
 	
 
 	public Principal getUser(final HttpServletRequest request, final HttpServletResponse response) {
 		// First, check to see if this session has already been authenticated
 		// during a previous request.
 
-		if ( JiraAuthAndRegistrationUtils.logSessionAndCookieInfo != null && "true".equals(JiraAuthAndRegistrationUtils.logSessionAndCookieInfo)){
-			logSessionAndCookies(request);
+		if ( JiraConfluenceAuthAndRegistrationUtils.logSessionAndCookieInfo != null && "true".equals(JiraConfluenceAuthAndRegistrationUtils.logSessionAndCookieInfo)){
+			JiraConfluenceUtils.logSessionAndCookies(request);
 		}
 		
 		Principal existingUser = getUserFromSession(request);
@@ -91,28 +74,6 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				log("->"+ headerName + ":-->"+request.getHeader(headerName));
 			}
 		}
-
-		// final HttpSession session = request.getSession();
-		// final Assertion assertion = (Assertion)
-		// session.getAttribute(AbstractCasFilter.CONST_CAS_ASSERTION);
-		//
-		// if (assertion != null) {
-		// final String username = assertion.getPrincipal().getName();
-		// final Principal user = getUser(username);
-		//
-		// if (user != null) {
-		// putPrincipalInSessionContext(request, user);
-		// getElevatedSecurityGuard().onSuccessfulLoginAttempt(request,
-		// username);
-		// LoginReason.OK.stampRequestResponse(request, response);
-		// LOGGER.debug("Logging in [{}] from CAS.", username);
-		// } else {
-		// LOGGER.debug("Failed logging [{}] from CAS.", username);
-		// getElevatedSecurityGuard().onFailedLoginAttempt(request, username);
-		// }
-		// return user;
-		// }
-		
 		String uidAsUrlParam = request.getParameter(ISF_HEADER);
 
 
@@ -130,109 +91,84 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				log("Unable to extract ISF uid:" + uid + " " + e);
 			}
 			
-			String upn = isfIdentifiers.getUpn().trim();
 			String email = isfIdentifiers.getEmail().trim();
 			String abn = isfIdentifiers.getAbn().trim();
 			String fullName = isfIdentifiers.getFullName();
+			String jiraUserName = isfIdentifiers.getJiraUserName();
 			
-			log("ISF identifiers: "  + uid + " upn='" + upn +"' email='" + email + "'");
+			log("ISF identifiers: " + isfIdentifiers.toString());
 			
-			if (upn == null || email ==null){
-				log("ISF uid or email null. ISF uid:"  + uid + " upn='" + upn +"' email='" + email + "'");
+			if (jiraUserName == null){
+				log("ISF jiraUserName is null." + isfIdentifiers.toString());
 			//do the authentication or reqistration
 			}else{
 				//check if user exists, if it does, log them in and return. Happy days.
 				try {
-					boolean userExists= JiraAuthAndRegistrationUtils.userExistsInJira(email);
+					boolean userExists= JiraConfluenceAuthAndRegistrationUtils.userExistsInJira(jiraUserName);
 					log("Does user exist:" + email + ":" + userExists);
 				if (userExists){
-					return logInExistingUser(email,request);
+					return logInExistingUser(jiraUserName,request);
 				}
 				//user does not exist. Register them and log them in on the fly.
 				else{
-					 log("Starting a workflow to create a new user in JIRA upn:'" + upn +"' email:'" + email + "'" );
-					 
-//					 log("**-->Start createNewJiraUser:" + upn + " :"+ email);
-//					 JiraAuthAndRegistrationUtils.createNewJiraUser(upn,email);
-//					 log("**-->Finish createNewJiraUser:" + upn + " :"+ email);
+					 log("Starting a workflow to create a new user in JIRA:" + isfIdentifiers.toString());
 					 
 
-
+					 log("**-->Start createNewJiraUser jiraUserName:" + jiraUserName + " email:"+ email);
+					 JiraConfluenceAuthAndRegistrationUtils.createNewJiraUser(jiraUserName,email, fullName);
+					 
 					 log("**-->Resolving abn to business name:" + abn);
-					 String businessName = JiraAuthAndRegistrationUtils.resolveAbnToBusinessName(abn);
+					 String businessName = JiraConfluenceAuthAndRegistrationUtils.resolveAbnToBusinessName(abn);
 					 
 					 log("**-->Start createOrganisationinServiceDesk:" + abn);
-					 String newOrgId = JiraAuthAndRegistrationUtils.createOrganisationinServiceDesk(abn, businessName);
+					 String newOrgId = JiraConfluenceAuthAndRegistrationUtils.createOrganisationinServiceDesk(businessName);
 
 					 log("**-->Start addOrganisationToServiceDesk:" + newOrgId);
-					 JiraAuthAndRegistrationUtils.addOrganisationToServiceDesk(newOrgId);
+					 JiraConfluenceAuthAndRegistrationUtils.addOrganisationToServiceDesk(newOrgId);
 
-					 log("**-->Start createCustomerInServiceDesk:" + upn + " :"+ email);
-					 JiraAuthAndRegistrationUtils.createCustomerInServiceDesk(email,fullName);
+//					 log("**-->Start createCustomerInServiceDesk:" + jiraUserName);
+//					 JiraAuthAndRegistrationUtils.createCustomerInServiceDesk(email,fullName);
 					 
-					 log("**-->Start addUserToExternalUsersGroup:" + upn + " :"+ email);
-					 JiraAuthAndRegistrationUtils.addUserToExternalUsersGroup(upn);
-					 log("**-->Finish addUserToExternalUsersGroup:" + upn + " :"+ email);
+					 log("**-->Start addUserToExternalUsersGroup:" + jiraUserName);
+					 JiraConfluenceAuthAndRegistrationUtils.addUserToExternalUsersGroup(jiraUserName);
 					 
-					 log("**-->Start addCustomerToOrganisation:" + upn + " :"+ email);
-					 JiraAuthAndRegistrationUtils.addCustomerToOrganisation(newOrgId, email);
+					 log("**-->Start addCustomerToOrganisation:" + jiraUserName);
+					 JiraConfluenceAuthAndRegistrationUtils.addCustomerToOrganisation(newOrgId, jiraUserName);
 
-					 log("**-->Start addUidPropertyToUser:" + upn + " :"+ email);
-					 JiraAuthAndRegistrationUtils.addUidPropertyToUser(email);
+					 log("**-->Start addUidPropertyToUser:"+ jiraUserName);
+					 JiraConfluenceAuthAndRegistrationUtils.addUidPropertyToUser(jiraUserName);
 					 
-					 log("**-->Start register compnay and user in insight abn:" + abn + " email:"+ email);
-					 JiraAuthAndRegistrationUtils.createDspAndContactInInsight(abn,businessName,fullName,email);
+					 log("**-->Start register compnay and user in insight businessName:" + businessName + " jiraUserName:"+ jiraUserName);
+					 JiraConfluenceAuthAndRegistrationUtils.createDspAndContactInInsight(abn,businessName,fullName,email,jiraUserName);
 
-					 log("Finished workflow to create a new user in JIRA upn:'" + upn +"' email:'" + email + "'" );
+					 log("Finished workflow to create a new user in JIRA jiraUserName:'" + jiraUserName);
 					 
 					 //final step, log in new user
-					 return logInExistingUser(email,request);
+					 return logInExistingUser(jiraUserName,request);
 
 				}
 				} catch (Exception e) {
-					log("Something went wrong with the workflow:" + upn + " "+ e);
+					log("Something went wrong with the workflow jiraUserName:" + jiraUserName + " "+ e);
 				    log(e.getMessage());
 				}
 			}
 		}
-		//log("---> Calling super");
 		return super.getUser(request, response);
 	}
 	
-	private void logSessionAndCookies(final HttpServletRequest request){
-		log("------>Logging session and cookie info<----");
-		log("sessionId:"+request.getRequestedSessionId());
-		Enumeration<String> attributeNames = request.getSession().getAttributeNames();
-		while(attributeNames.hasMoreElements()){
-			String sessionAtributeName= attributeNames.nextElement();
-			log(sessionAtributeName + ":" + request.getSession().getAttribute(sessionAtributeName).toString());
-		}
-		log("cookieInfo"+request.getRequestedSessionId());
-		Cookie[] cookies = request.getCookies();
-		if (cookies!=null){
-			for (int i = 0; i < cookies.length; i++) {
-			  String name = cookies[i].getName();
-			  String value = cookies[i].getValue();
-			  log(name + ":" + value);
-			}
-		}
-		log("------>Finished Logging session and cookie info<----");
-		log("");
-
-	}
 	
 	
-	private Principal logInExistingUser(String upn, final HttpServletRequest request){
-		log("---> creating principal:" + upn);
+	private Principal logInExistingUser(String jiraUserName, final HttpServletRequest request){
+		log("---> creating principal:" + jiraUserName);
 
-		final String username = upn;
+		final String username = jiraUserName;
 		final Principal principal = new Principal() {
 			@Override
 			public String getName() {
 				return username;
 			}
 		};
-		log("---> login existing user:" + upn);
+		log("---> login existing user:" + jiraUserName);
 	    putPrincipalInSessionContext(request, principal);
 		getElevatedSecurityGuard().onSuccessfulLoginAttempt(request,username);
 		return principal;
@@ -261,40 +197,5 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	private static void log(String logMessage, Exception ex){
 		LOGGER.error(logMessage, ex);
 	}
-
-	
-	
-//	public static void getJiraUser(String username) throws JSONException{
-//		
-//		 String url = "http://localhost:8080/rest/api/2/user?username="+username;
-//		 
-//		 	LOGGER.error("calling getJiraUser with username:" + username);
-//			String plainCreds = "admin:admin";
-//			byte[] plainCredsBytes = plainCreds.getBytes();
-//			byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
-//			String base64Creds = new String(base64CredsBytes);
-//
-//			HttpHeaders headers = new HttpHeaders();
-//			headers.add("Authorization", "Basic " + base64Creds);
-//			headers.setContentType(MediaType.APPLICATION_JSON);
-//			headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-//
-//			RestTemplate restTemplate = new RestTemplate();
-//			HttpEntity<String> request = new HttpEntity<String>(headers);
-//			LOGGER.error(request.toString());
-//			LOGGER.error(request.getHeaders().toString());
-//			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-//			String stringResponse = response.getBody();
-//			LOGGER.error(stringResponse);
-//			JSONObject user = new JSONObject(stringResponse);
-//			LOGGER.error("End "+user.getString("key") + " " + user.getString("name") + " " + user.getString("emailAddress")); 
-//	}
-
-	
-	
-
-
-
-	
 	
 }
