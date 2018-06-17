@@ -199,11 +199,11 @@ public final class Confluence35CasAuthenticator extends ConfluenceAuthenticator 
 	
 	
 	private static void log(String logMessage){
-		LOGGER.error(logMessage);
+		LOGGER.info(logMessage);
 	}
 	
 	private static void log(String logMessage, Exception ex){
-		LOGGER.error(logMessage, ex);
+		LOGGER.info(logMessage, ex);
 	}
 
 	public boolean logout(final HttpServletRequest request, final HttpServletResponse response)

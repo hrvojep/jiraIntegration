@@ -14,6 +14,15 @@ public class JiraConfluenceUtils {
 
 	
 	public static void logSessionAndCookies(final HttpServletRequest request){
+
+		log("------>Logging HTTP headers<------");
+		Enumeration<String> headerNames =request.getHeaderNames();
+		while (headerNames.hasMoreElements()){			
+			String headerName = headerNames.nextElement();
+				log("HTTP HEADER:"+ headerName + " :-->"+request.getHeader(headerName));
+			}
+
+		
 		log("------>Logging session and cookie info<----");
 		log("sessionId:"+request.getRequestedSessionId());
 		Enumeration<String> attributeNames = request.getSession().getAttributeNames();
@@ -35,6 +44,15 @@ public class JiraConfluenceUtils {
 
 	}
 	
+	
+	private void logHttpHeaders(final HttpServletRequest request){
+		Enumeration<String> headerNames =request.getHeaderNames();
+		while (headerNames.hasMoreElements()){			
+			String headerName = headerNames.nextElement();
+				log("HTTP HEADER:"+ headerName + " :-->"+request.getHeader(headerName));
+			}
+		}
+
 	
 	private static void log(String logMessage){
 		LOGGER.error(logMessage);

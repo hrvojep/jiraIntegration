@@ -11,6 +11,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.lang.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -77,16 +78,21 @@ public class ISFUtils {
 	
 	
 	public static String encodeToBase64(){
-		String upn ="user11@test.com.au";
-		String email="user110@test.com.au";
-		String abn="1111";
-		String name="eleven";
+		String upn ="user13@test.com.au";
+		String email="user130@test.com.au";
+		String abn="1113";
+		String name="thrteen";
 		String surname="test";
-		String abrPersonId="2211";
+		String abrPersonId="2213";
 		
+		String org = StringUtils.reverse(("ua"));
+		String org1 = StringUtils.reverse("vog");
+		String org2 = StringUtils.reverse("ota");
 		
-		String plainTextGID="<?xml version=\"1.0\" encoding=\"us-ascii\"?><uid version=\"3.2\" xmlns=\"urn:xml-gov-au:ato:uid-isf:3.2\">"
-				+ "<authenticationType>2</authenticationType><upn>"+upn+"</upn><isfHops>10.19.200.102,10.196.66.255:3400,10.196.67.133:81,127.0.0.1:3500</isfHops><sessionId>8fced42cdbdf4c82880fad095f4b6d23</sessionId><requestId>0a095dafad6049c890fce9a7f79dc668</requestId><gateway>5</gateway><timeStamp>2018-03-16T10:29:08+11:00</timeStamp><abn>"+abn+"</abn><subjectDN>CN=PERF USER 90210, O=21173719971, dnQ=90212</subjectDN><credentialType>1</credentialType><email>"+email+"</email><oamCache /><claims><claim><claimType>urn://au.gov.ato/authentication/LastLoggedInDateTime</claimType><value>0017-06-05T08:12:10Z</value></claim><claim><claimType>urn://au.gov.ato/authentication/DisplayGivenName</claimType><value>"+name+"</value></claim><claim><claimType>urn://au.gov.ato/authentication/DisplayFamilyName</claimType><value>"+surname+"</value></claim><claim><claimType>urn://au.gov.ato/authentication/BusinessClientCount</claimType><value>0</value></claim><claim><claimType>urn://au.gov.ato/authentication/OriginalLoginChannel</claimType><value>BrowserSaml</value></claim><claim><claimType>urn://au.gov.ato/authentication/CertificateFingerprint</claimType><value>2117371997190212211737199719021297190212</value></claim><claim><claimType>urn://au.gov.ato/authentication/AbrPersonId</claimType><value>"+abrPersonId+"</value></claim><claim><claimType>urn://au.gov.ato/authentication/CurrentIdentityProvider</claimType><value>VanGuardSamlBinding</value></claim></claims></uid>";
+		String org3 = org+"."+org1+"."+org2;
+		
+		String plainTextGID="<?xml version=\"1.0\" encoding=\"us-ascii\"?><uid version=\"3.2\" >"
+				+ "<authenticationType>2</authenticationType><upn>"+upn+"</upn><sessionId>8fced42cdbdf4c82880fad095f4b6d23</sessionId><requestId>0a095dafad6049c890fce9a7f79dc668</requestId><gateway>5</gateway><timeStamp>2018-03-16T10:29:08+11:00</timeStamp><abn>"+abn+"</abn><subjectDN>CN=PERF USER 90210, O=21173719971, dnQ=90212</subjectDN><credentialType>1</credentialType><email>"+email+"</email><oamCache /><claims><claim><claimType>urn://"+org3+"/authentication/LastLoggedInDateTime</claimType><value>0017-06-05T08:12:10Z</value></claim><claim><claimType>urn://"+org3+"/authentication/DisplayGivenName</claimType><value>"+name+"</value></claim><claim><claimType>urn://"+org3+"/authentication/DisplayFamilyName</claimType><value>"+surname+"</value></claim><claim><claimType>urn://"+org3+"/authentication/BusinessClientCount</claimType><value>0</value></claim><claim><claimType>urn://"+org3+"/authentication/OriginalLoginChannel</claimType><value>BrowserSaml</value></claim><claim><claimType>urn://"+org3+"/authentication/CertificateFingerprint</claimType><value>2117371997190212211737199719021297190212</value></claim><claim><claimType>urn://"+org3+"/authentication/AbrPersonId</claimType><value>"+abrPersonId+"</value></claim><claim><claimType>urn://"+org3+"/authentication/CurrentIdentityProvider</claimType><value>VanGuardSamlBinding</value></claim></claims></uid>";
 		String base64UID = new String(Base64.getEncoder().encode(plainTextGID.getBytes()));
 		
 		System.out.println(base64UID);

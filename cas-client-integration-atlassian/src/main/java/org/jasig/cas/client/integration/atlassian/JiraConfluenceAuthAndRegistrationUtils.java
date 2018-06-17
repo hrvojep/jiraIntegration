@@ -14,7 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -88,16 +87,23 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 	private static String objectTypeAttributeIdContactName = jiraAppProps.getProperty("objectTypeAttributeIdContactName");
 	private static String objectTypeAttributeIdContactCompanyId = jiraAppProps.getProperty("objectTypeAttributeIdContactCompanyId");
 	private static String objectTypeAttributeIdContactUserNameId = jiraAppProps.getProperty("objectTypeAttributeIdContactUserNameId");
+	private static String objectTypeAttributeIdOrgRegistrationStatusId = jiraAppProps.getProperty("objectTypeAttributeIdOrgRegistrationStatusId");
+	private static String objectTypeAttributeIdOrgRegistrationStatusUnregisteredValueId = jiraAppProps.getProperty("objectTypeAttributeIdOrgRegistrationStatusUnregisteredValueId");
+	private static String objectTypeAttributeIdContactRegistrationStatusId = jiraAppProps.getProperty("objectTypeAttributeIdContactRegistrationStatusId");
+	private static String objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId = jiraAppProps.getProperty("objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId");
+	public static String abrLookupProxyHost = jiraAppProps.getProperty("abrLookupProxyHost");
+	public static String abrLookupProxyPort = jiraAppProps.getProperty("abrLookupProxyPort");
+	public static String abrLookupProxyBase64EncodedUserNamePassword = jiraAppProps.getProperty("abrLookupProxyBase64EncodedUserNamePassword");	
+	
 	private static String dspObjectSchemaId = jiraAppProps.getProperty("dspObjectSchemaId");
-
 	private static String jiraPlainCreds = jiraUser+":" +jiraPassword;
 
 	
 	//CONFLUENCE PROPERTIES
 	private static String localConfluenceRestUrl = confluenceProperties.getProperty("localConfluenceRestUrl");
-//	private static String conlufenceRestUser=jiraAppProps.getProperty("adminuser");
-//	private static String conlufenceRestUserPassword = jiraAppProps.getProperty("adminpassword");
-//	private static String confluencePlainCreds = conlufenceRestUser+":" +conlufenceRestUserPassword;
+	private static String conlufenceRestUser=confluenceProperties.getProperty("adminuser");
+	private static String conlufenceRestUserPassword = confluenceProperties.getProperty("adminpassword");
+	private static String confluencePlainCreds = conlufenceRestUser+":" +conlufenceRestUserPassword;
 
 
 	
@@ -110,7 +116,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		String fullUrl = localJiraRestUrl + "/api/2/user?username=" + userName;
 
 		RestTemplate restTemplate = new RestTemplate();
-		HttpEntity<String> request = getRequest(null,false);
+		HttpEntity<String> request = getRequest(null,false, "JIRA");
 		
 		log("making request with url:" + fullUrl + " requestBody:" + request.getBody() + " requestToString:" + request.toString());		
 		try {
@@ -141,7 +147,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		String fullUrl = localConfluenceRestUrl + "/api/user?username=" + userName;
 
 		RestTemplate restTemplate = new RestTemplate();
-		HttpEntity<String> request = getRequest(null,false);
+		HttpEntity<String> request = getRequest(null,false, "CONFLUENCE");
 		
 		log("making request with url:" + fullUrl + " requestBody:" + request.getBody() + " requestToString:" + request.toString());		
 		try {
@@ -226,7 +232,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		String requestBody = "{\"name\": \""+username+"\",  \"emailAddress\": \""+email+"\", \"displayName\": \""+fullName+"\", \"applicationKeys\": [] }'";
 
 		
-		HttpEntity<String> request = getRequest(requestBody,false);
+		HttpEntity<String> request = getRequest(requestBody,false, "JIRA");
 		ResponseEntity<String> responseEntity=null;
 		String response=null;
 		try{
@@ -253,7 +259,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 			JSONObject json = new JSONObject();
 			json.put("",email);
 			String requestBody = json.toString();
-			HttpEntity<String> request = getRequest(requestBody,false);
+			HttpEntity<String> request = getRequest(requestBody,false, "JIRA");
 
 			RestTemplate restTemplate = new RestTemplate();
 			try{
@@ -274,7 +280,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		JSONObject json = new JSONObject();
 		json.put("name",jiraUserName);
 		String requestBody = json.toString();
-		HttpEntity<String> request = getRequest(requestBody,false);
+		HttpEntity<String> request = getRequest(requestBody,false, "JIRA");
 
 		RestTemplate restTemplate = new RestTemplate();
 		try{
@@ -289,6 +295,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 	
 	public static String resolveAbnToBusinessName(String abn) throws Exception {		
 		String resolvedBusinessName="";
+		//check to resolve business name through the lookup service
 		if (resolveAbnToBusinessName!=null && resolveAbnToBusinessName.equalsIgnoreCase("true")){
 			AbnSearchResult result = AbnSearchWSHttpGet.searchByABN(abnLookupAuthGuid, abn, false);
 			if (result.isException()){
@@ -296,10 +303,17 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 				throw new Exception("Could not lookup ABN:" + abn + " " + result.getExceptionDescription());
 			}
 			resolvedBusinessName =  result.getOrganisationName();
+			if (resolvedBusinessName == null || resolvedBusinessName.trim().length()==0){
+				resolvedBusinessName=result.getTradingName();
+			}
+			if (resolvedBusinessName == null || resolvedBusinessName.trim().length()==0){
+				resolvedBusinessName=abn;
+			}			
 		} else{
-			//we can't resolve abn to business name, just return abn
+			//we don't wont to resolve abn to business name, just return abn
 			resolvedBusinessName = abn;
 		}
+		log("Resolved abn:" + abn + " to:" + resolvedBusinessName);
 		return resolvedBusinessName;
 	}
 	
@@ -319,7 +333,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		JSONObject json = new JSONObject();
 		json.put("name",businessName);
 		String requestBody = json.toString();
-		HttpEntity<String> request = getRequest(requestBody,true);
+		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 		RestTemplate restTemplate = new RestTemplate();
 		ResponseEntity<String> response=null;
 		try{
@@ -346,7 +360,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		JSONObject json = new JSONObject();
 		json.put("organizationId",orgId);
 		String requestBody = json.toString();
-		HttpEntity<String> request = getRequest(requestBody,true);
+		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 		RestTemplate restTemplate = new RestTemplate();
 		ResponseEntity<String> response=null;
 		try{
@@ -373,7 +387,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		json.put("email", email);
 		json.put("fullName",fullName);
 		String requestBody = json.toString();
-		HttpEntity<String> request = getRequest(requestBody,true);
+		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 
 		RestTemplate restTemplate = new RestTemplate();
 		System.out.println(request.toString());
@@ -401,7 +415,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		String url = localJiraRestUrl + "/servicedeskapi/organization/"+ organisationId +"/user";
 		log("calling addCustomerToOrganisation with organisationId:" + organisationId + " userName:" + userName + " with url: " + url);		
 		String requestBody="{\"usernames\": [\""+ userName +"\"]}";
-		HttpEntity<String> request = getRequest(requestBody,true);
+		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 		RestTemplate restTemplate = new RestTemplate();
 		try{
 			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
@@ -413,9 +427,9 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 
 	
 	
-	private static HttpEntity<String>  getRequest(String body, boolean addExperimentalHeader){
+	private static HttpEntity<String>  getRequest(String body, boolean addExperimentalHeader, String application){
 		HttpHeaders headers = new HttpHeaders();
-		headers.add("Authorization", "Basic " + getCreds());
+		headers.add("Authorization", "Basic " + getCreds(application));
 		if (addExperimentalHeader){
 			headers.add("X-ExperimentalApi", "opt-in");			
 		}
@@ -471,9 +485,9 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		// if DSP doesn't exist register it
 		if (insightDSPid == null){
 			log("calling createOrganisationInInsight with businessName:" + businessName + " abn:" + abn);
-			String requestBody="{\"objectTypeId\": "+ objectTypeIdOrg +", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgName+", \"objectAttributeValues\": [{\"value\": \""+businessName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgAbn+", \"objectAttributeValues\": [{\"value\": \""+abn+"\"}] } ] }'";
+			String requestBody="{\"objectTypeId\": "+ objectTypeIdOrg +", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgName+", \"objectAttributeValues\": [{\"value\": \""+businessName+"\"}] },{\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgRegistrationStatusId+", \"objectAttributeValues\": [{\"value\": \""+objectTypeAttributeIdOrgRegistrationStatusUnregisteredValueId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdOrgAbn+", \"objectAttributeValues\": [{\"value\": \""+abn+"\"}] } ] }'";
 			String url = localJiraRestUrl + "/insight/1.0/object/create";
-			HttpEntity<String> request = getRequest(requestBody,true);
+			HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<String> response=null;
 			try{
@@ -500,7 +514,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 
 		log("Strarting getRegisteredDSPidFromInsight with abn:" + abn + " url:" + url);
 
-		HttpEntity<String> request = getRequest(null,true);
+		HttpEntity<String> request = getRequest(null,true, "JIRA");
 		RestTemplate restTemplate = new RestTemplate();
 		ResponseEntity<String> response=null;
 		try{
@@ -554,9 +568,9 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		
 		log("calling createContactInInsight with companyId:" + contactCompanyId + " contactname:" + contactName + " contactEmail:" + contactEmail);
 
-		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] },  {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactUserNameId+", \"objectAttributeValues\": [{\"value\": \""+jiraUserName+"\"}] }  ] }'";
+		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactRegistrationStatusId+", \"objectAttributeValues\": [{\"value\": \""+objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactUserNameId+", \"objectAttributeValues\": [{\"value\": \""+jiraUserName+"\"}] }  ] }'";
 		String url = localJiraRestUrl + "/insight/1.0/object/create";
-		HttpEntity<String> request = getRequest(requestBody,true);
+		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 
 		RestTemplate restTemplate = new RestTemplate();
 		log(request.toString());
@@ -577,15 +591,20 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 	
 
 	private static void log(String logMessage){
-		LOGGER.error(logMessage);
+		LOGGER.info(logMessage);
 	}
 	
 	private static void log(String logMessage, Exception ex){
-		LOGGER.error(logMessage, ex);
+		LOGGER.info(logMessage, ex);
 	}
 
-	private static String getCreds(){
-		byte[] plainCredsBytes = jiraPlainCreds.getBytes();
+	private static String getCreds(String application){
+		byte[] plainCredsBytes;
+		if (application.equals("JIRA")){
+			plainCredsBytes = jiraPlainCreds.getBytes();
+		}else{
+			plainCredsBytes = confluencePlainCreds.getBytes();
+		}
 		byte[] base64CredsBytes = Base64.getEncoder().encode(plainCredsBytes);
 		String base64Creds = new String(base64CredsBytes);
 		return base64Creds;

@@ -67,16 +67,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 			return existingUser;
 		}
 		
-		Enumeration<String> headerNames =request.getHeaderNames();
-		while (headerNames.hasMoreElements()){			
-			String headerName = headerNames.nextElement();
-			if (headerName.equals(ISF_HEADER)){
-				log("->"+ headerName + ":-->"+request.getHeader(headerName));
-			}
-		}
 		String uidAsUrlParam = request.getParameter(ISF_HEADER);
-
-
 		//do we have ISF UID header, if we do, do stuff with it
 		String uid=request.getHeader(ISF_HEADER);
 		if (uid !=null || uidAsUrlParam !=null){
@@ -84,6 +75,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 				uid=uidAsUrlParam;
 			}
 			log("Got UID:" + uid);
+			
 			ISFJiraIdentifiers isfIdentifiers=null;
 			try {
 				isfIdentifiers = ISFUtils.getISFIdentifiers(ISFUtils.getXMLFromBase64String(uid));
@@ -120,7 +112,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 					 log("**-->Resolving abn to business name:" + abn);
 					 String businessName = JiraConfluenceAuthAndRegistrationUtils.resolveAbnToBusinessName(abn);
 					 
-					 log("**-->Start createOrganisationinServiceDesk:" + abn);
+					 log("**-->Start createOrganisationinServiceDesk:" + businessName);
 					 String newOrgId = JiraConfluenceAuthAndRegistrationUtils.createOrganisationinServiceDesk(businessName);
 
 					 log("**-->Start addOrganisationToServiceDesk:" + newOrgId);
@@ -157,6 +149,8 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	}
 	
 	
+
+	
 	
 	private Principal logInExistingUser(String jiraUserName, final HttpServletRequest request){
 		log("---> creating principal:" + jiraUserName);
@@ -191,11 +185,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 	}
 	
 	private static void log(String logMessage){
-		LOGGER.error(logMessage);
+		LOGGER.info(logMessage);
 	}
-	
-	private static void log(String logMessage, Exception ex){
-		LOGGER.error(logMessage, ex);
-	}
-	
+		
 }

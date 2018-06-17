@@ -1,7 +1,10 @@
 package abn.lookup;
 
 import java.io.IOException;
+import java.net.Authenticator;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -10,6 +13,7 @@ import javax.xml.parsers.FactoryConfigurationError;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
+import static org.jasig.cas.client.integration.atlassian.JiraConfluenceAuthAndRegistrationUtils.*;
 
 public class AbnSearchWSHttpGet
 {
@@ -163,12 +167,14 @@ public class AbnSearchWSHttpGet
 	{
 		AbnSearchResult result = null;
 
-		URL url = new URL("https://abr.business.gov.au/abrxmlsearch/ABRXMLSearch.asmx/" + service + "?authenticationGuid=" + URLEncoder.encode(guid, UTF_8) + parameters);
-
-		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		URL url = new URL("http://abr.business.gov.au/abrxmlsearch/ABRXMLSearch.asmx/" + service + "?authenticationGuid=" + URLEncoder.encode(guid, UTF_8) + parameters);
+		Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(abrLookupProxyHost, Integer.valueOf(abrLookupProxyPort)));
+		HttpURLConnection connection = (HttpURLConnection) url.openConnection(proxy);
 
 		connection.setRequestMethod("GET");
 		connection.setRequestProperty("Content-Type", "text/xml; charset-utf-8");
+		connection.setRequestProperty("Proxy-Authorization", "Basic " + abrLookupProxyBase64EncodedUserNamePassword);
+
 		connection.connect();
 
 		if (connection.getResponseCode() == HttpURLConnection.HTTP_OK)
