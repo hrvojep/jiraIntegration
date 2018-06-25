@@ -18,12 +18,8 @@
  */
 package org.jasig.cas.client.integration.atlassian;
 
-import java.io.FileInputStream;
 import java.security.Principal;
-import java.util.Enumeration;
-import java.util.Properties;
 
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
