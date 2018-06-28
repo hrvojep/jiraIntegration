@@ -62,7 +62,7 @@ public final class Jira44CasAuthenticator extends JiraSeraphAuthenticator {
 			log("Session found; user already logged in. User name:" + existingUser.getName());
 			return existingUser;
 		}
-		
+				
 		String uidAsUrlParam = request.getParameter(ISF_HEADER);
 		//do we have ISF UID header, if we do, do stuff with it
 		String uid=request.getHeader(ISF_HEADER);

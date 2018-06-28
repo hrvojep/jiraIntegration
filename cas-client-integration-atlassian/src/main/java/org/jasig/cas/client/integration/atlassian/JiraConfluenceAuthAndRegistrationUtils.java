@@ -91,6 +91,9 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 	private static String objectTypeAttributeIdOrgRegistrationStatusUnregisteredValueId = jiraAppProps.getProperty("objectTypeAttributeIdOrgRegistrationStatusUnregisteredValueId");
 	private static String objectTypeAttributeIdContactRegistrationStatusId = jiraAppProps.getProperty("objectTypeAttributeIdContactRegistrationStatusId");
 	private static String objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId = jiraAppProps.getProperty("objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId");
+	private static String objectTypeAttributeIdContactJiraUserId = jiraAppProps.getProperty("objectTypeAttributeIdContactJiraUserId");
+	
+	
 	public static String abrLookupProxyHost = jiraAppProps.getProperty("abrLookupProxyHost");
 	public static String abrLookupProxyPort = jiraAppProps.getProperty("abrLookupProxyPort");
 	public static String abrLookupProxyBase64EncodedUserNamePassword = jiraAppProps.getProperty("abrLookupProxyBase64EncodedUserNamePassword");	
@@ -223,15 +226,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 		log("registering new user username:'" + username +"' email:'" + email + "'" + " with url:" + url);
 		
 		RestTemplate restTemplate = new RestTemplate();
-//		JSONObject json = new JSONObject();
-//		json.put("name", username);
-//		json.put("emailAddress", email);
-//		json.put("displayName", fullName);
-//		json.put("applicationKeys","[]");
-		
 		String requestBody = "{\"name\": \""+username+"\",  \"emailAddress\": \""+email+"\", \"displayName\": \""+fullName+"\", \"applicationKeys\": [] }'";
-
-		
 		HttpEntity<String> request = getRequest(requestBody,false, "JIRA");
 		ResponseEntity<String> responseEntity=null;
 		String response=null;
@@ -567,8 +562,7 @@ public class JiraConfluenceAuthAndRegistrationUtils {
 //		}'	
 		
 		log("calling createContactInInsight with companyId:" + contactCompanyId + " contactname:" + contactName + " contactEmail:" + contactEmail);
-
-		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactRegistrationStatusId+", \"objectAttributeValues\": [{\"value\": \""+objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactUserNameId+", \"objectAttributeValues\": [{\"value\": \""+jiraUserName+"\"}] }  ] }'";
+		String requestBody="{\"objectTypeId\": "+objectTypeIdContact+", \"attributes\": [{\"objectTypeAttributeId\": "+objectTypeAttributeIdContactEmail+", \"objectAttributeValues\": [{\"value\": \""+contactEmail+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactName+", \"objectAttributeValues\": [{\"value\": \""+contactName+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactCompanyId+", \"objectAttributeValues\": [{\"value\": \""+contactCompanyId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactRegistrationStatusId+", \"objectAttributeValues\": [{\"value\": \""+objectTypeAttributeIdContactRegistrationStatusUnregisteredValueId+"\"}] }, {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactJiraUserId+", \"objectAttributeValues\": [{\"value\": \""+jiraUserName+"\"}] } , {\"objectTypeAttributeId\": "+objectTypeAttributeIdContactUserNameId+", \"objectAttributeValues\": [{\"value\": \""+jiraUserName+"\"}] }  ] }'";
 		String url = localJiraRestUrl + "/insight/1.0/object/create";
 		HttpEntity<String> request = getRequest(requestBody,true, "JIRA");
 
